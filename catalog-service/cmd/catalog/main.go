@@ -26,7 +26,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db.Close()
+	defer func() {
+		err = db.Close()
+		if err != nil {
+			log.Fatalf("Error closing DB connection: %v", err)
+		}
+	}()
 
 	if err := db.Ping(); err != nil {
 		log.Fatal("Cannot connect to PostgreSQL:", err)
@@ -39,5 +44,8 @@ func main() {
 	handler := httpapi.NewBookHandler(service)
 	router := httpapi.NewRouter(handler)
 
-	router.Run(":8080")
+	err = router.Run(":8080")
+	if err != nil {
+		log.Fatalf("Error starting HTTP server: %s", err)
+	}
 }

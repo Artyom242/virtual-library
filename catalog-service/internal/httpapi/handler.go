@@ -1,22 +1,19 @@
-package catalog
+package httpapi
 
 import (
+	"errors"
+	"net/http"
 	"strconv"
+	"virtual-library/catalog-service/internal/catalog"
 
 	"github.com/gin-gonic/gin"
 )
 
 type BookHandler struct {
-	service *BookService
+	service *catalog.BookService
 }
 
-type CreateBookRequest struct {
-	Title  string `json:"title" binding:"required"`
-	Author string `json:"author" binding:"required"`
-	Year   int    `json:"year" binding:"required,min=1"`
-}
-
-func NewBookHandler(service *BookService) *BookHandler {
+func NewBookHandler(service *catalog.BookService) *BookHandler {
 	return &BookHandler{service: service}
 }
 
@@ -31,19 +28,20 @@ func (h *BookHandler) GetByID(c *gin.Context) {
 	}
 
 	book, err := h.service.GetByID(id)
-	if err != nil {
-		c.JSON(500, gin.H{
-			"message": "Internal Server Error",
-		})
-		return
-	} else if book == nil {
+	if errors.Is(err, catalog.ErrBookNotFound) {
 		c.JSON(404, gin.H{
 			"message": "Book not found",
 		})
 		return
 	}
+	if err != nil {
+		c.JSON(500, gin.H{
+			"message": err,
+		})
+		return
+	}
 	c.JSON(200, gin.H{
-		"message": book,
+		"data": book,
 	})
 	return
 }
@@ -63,7 +61,7 @@ func (h *BookHandler) GetAll(c *gin.Context) {
 	return
 }
 func (h *BookHandler) CreateBook(c *gin.Context) {
-	request := CreateBookRequest{}
+	var request CreateBookRequest
 
 	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(400, gin.H{
@@ -72,7 +70,7 @@ func (h *BookHandler) CreateBook(c *gin.Context) {
 		return
 	}
 
-	book := Book{
+	book := catalog.Book{
 		Title:  request.Title,
 		Author: request.Author,
 		Year:   request.Year,
@@ -102,11 +100,17 @@ func (h *BookHandler) DeleteBook(c *gin.Context) {
 	}
 
 	err = h.service.Delete(id)
-	if err != nil {
+	if errors.Is(err, catalog.ErrBookNotFound) {
 		c.JSON(404, gin.H{
-			"error": err,
+			"message": "Book not found",
 		})
 		return
+	}
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Internal Server Error",
+		})
 	}
 
 	c.Status(204)

@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"errors"
 	"virtual-library/catalog-service/internal/catalog"
 )
 
@@ -32,7 +31,7 @@ func (c *MemoryBookRepository) GetByID(bookID int) (*catalog.Book, error) {
 	book, ok := c.books[bookID]
 
 	if !ok {
-		return nil, errors.New("book not found")
+		return nil, catalog.ErrBookNotFound
 	}
 
 	return &book, nil
@@ -52,7 +51,7 @@ func (c *MemoryBookRepository) Delete(bookID int) error {
 	_, ok := c.books[bookID]
 
 	if !ok {
-		return errors.New("book not found")
+		return catalog.ErrBookNotFound
 	}
 
 	delete(c.books, bookID)
