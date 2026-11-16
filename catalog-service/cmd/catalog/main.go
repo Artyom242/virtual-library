@@ -1,13 +1,15 @@
 package main
 
 import (
-	"database/sql"
+	"context"
 	"log"
 	"os"
-	"virtual-library/catalog-service/internal/catalog"
+	"time"
 	"virtual-library/catalog-service/internal/httpapi"
-	"virtual-library/catalog-service/internal/memory"
+	"virtual-library/catalog-service/internal/postgres"
+	"virtual-library/catalog-service/internal/service"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/joho/godotenv"
 )
@@ -22,27 +24,30 @@ func main() {
 		log.Fatal("DATABASE_URL environment variable not set")
 	}
 
-	db, err := sql.Open("pgx", databaseURL)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	pool, err := pgxpool.New(ctx, databaseURL)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer func() {
-		err = db.Close()
-		if err != nil {
-			log.Fatalf("Error closing DB connection: %v", err)
-		}
-	}()
+	defer pool.Close()
 
-	if err := db.Ping(); err != nil {
+	if err := pool.Ping(ctx); err != nil {
 		log.Fatal("Cannot connect to PostgreSQL:", err)
 	}
 	log.Println("Connected to PostgreSQL")
 
-	repo := memory.NewMemoryBookRepository()
-	//repo := postgres.NewBookRepository(db)
-	service := catalog.NewService(repo)
-	handler := httpapi.NewBookHandler(service)
-	router := httpapi.NewRouter(handler)
+	tx := postgres.NewPgxTransactor(pool)
+	// Author process
+	authorRepo := postgres.NewAuthorRepository(pool)
+	authorService := service.NewAuthorService(authorRepo)
+	authorHandler := httpapi.NewAuthorHandler(authorService)
+	// Book process
+	bookRepo := postgres.NewBookRepository(pool)
+	bookService := service.NewService(tx, bookRepo, authorRepo)
+	bookHandler := httpapi.NewBookHandler(bookService)
+	router := httpapi.NewRouter(bookHandler, authorHandler)
 
 	err = router.Run(":8080")
 	if err != nil {
