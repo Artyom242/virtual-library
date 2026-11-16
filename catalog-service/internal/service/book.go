@@ -25,15 +25,6 @@ func NewService(
 }
 
 func (s *BookService) Create(ctx context.Context, book domain.Book) (domain.Book, error) {
-	//author, err := s.repoAuthor.GetByID(ctx, book.AuthorID)
-	//if errors.Is(err, domain.ErrAuthorNotFound) {
-	//	author = &domain.Author{}
-	//	return s.CreateBookWithNewAuthor(ctx, book, *author)
-	//}
-	//if err != nil {
-	//	return domain.Book{}, err
-	//}
-	//
 	return s.repoBook.Create(ctx, book)
 }
 

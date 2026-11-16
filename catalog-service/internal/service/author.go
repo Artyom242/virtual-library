@@ -23,7 +23,7 @@ func (svc *AuthorService) Delete(ctx context.Context, id int) error {
 func (svc *AuthorService) GetAll(ctx context.Context) ([]domain.Author, error) {
 	return svc.repo.GetAll(ctx)
 }
-func (svc *AuthorService) GetById(ctx context.Context, id int) (*domain.Author, error) {
+func (svc *AuthorService) GetByID(ctx context.Context, id int) (*domain.Author, error) {
 	return svc.repo.GetByID(ctx, id)
 }
 func (svc *AuthorService) Update(ctx context.Context, id int, patch domain.AuthorPatch) (domain.Author, error) {

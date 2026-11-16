@@ -72,7 +72,7 @@ func (h *AuthorHandler) GetByID(c *gin.Context) {
 		})
 		return
 	}
-	author, err := h.service.GetById(ctx, id)
+	author, err := h.service.GetByID(ctx, id)
 
 	if errors.Is(err, domain.ErrBookNotFound) {
 		c.JSON(http.StatusNotFound, gin.H{
