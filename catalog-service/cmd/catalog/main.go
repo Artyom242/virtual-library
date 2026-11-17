@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"os"
 	"time"
 	"virtual-library/catalog-service/internal/httpapi"
@@ -23,6 +24,9 @@ func main() {
 	if databaseURL == "" {
 		log.Fatal("DATABASE_URL environment variable not set")
 	}
+
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

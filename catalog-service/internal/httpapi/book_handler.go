@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"virtual-library/catalog-service/internal/domain"
@@ -24,25 +25,40 @@ func (h *BookHandler) GetByID(c *gin.Context) {
 	data := c.Param("id")
 	id, err := strconv.Atoi(data)
 	if err != nil {
+		slog.WarnContext(ctx, "invalid id",
+			slog.String("book_id", data),
+			slog.Any("error", err),
+		)
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message": "Invalid Book Id",
+			"message": domain.ErrInvalidBookID.Error(),
 		})
 		return
 	}
 
 	book, err := h.service.GetByID(ctx, id)
 	if errors.Is(err, domain.ErrBookNotFound) {
+		slog.WarnContext(ctx, "book not found",
+			slog.Int("book_id", id),
+		)
 		c.JSON(http.StatusNotFound, gin.H{
-			"message": "Book not found",
+			"message": domain.ErrBookNotFound.Error(),
 		})
 		return
 	}
 	if err != nil {
+		slog.ErrorContext(ctx, "failed to get book by id",
+			slog.Int("book_id", id),
+			slog.Any("error", err),
+		)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"message": err,
+			"message": domain.ErrInternalServer.Error(),
 		})
 		return
 	}
+	slog.InfoContext(ctx, "book found",
+		slog.Int("book_id", id),
+		slog.Any("book", book),
+	)
 	c.JSON(http.StatusOK, gin.H{
 		"data": book,
 	})
@@ -52,12 +68,18 @@ func (h *BookHandler) GetAll(c *gin.Context) {
 	books, err := h.service.GetAll(ctx)
 
 	if err != nil {
+		slog.ErrorContext(ctx, "failed to get all books",
+			slog.Any("error", err),
+		)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Internal Server Error",
+			"message": domain.ErrInternalServer.Error(),
 		})
 		return
 	}
 
+	slog.InfoContext(ctx, "got all books",
+		slog.Int("count", len(books)),
+	)
 	c.JSON(http.StatusOK, gin.H{
 		"data": books,
 	})
@@ -67,8 +89,11 @@ func (h *BookHandler) Create(c *gin.Context) {
 	var request dto.CreateBookRequest
 
 	if err := c.ShouldBindJSON(&request); err != nil {
+		slog.ErrorContext(ctx, "invalid request body",
+			slog.Any("error", err),
+		)
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message": "Invalid Book Data",
+			"message": domain.ErrInvalidBookData.Error(),
 		})
 		return
 	}
@@ -79,16 +104,28 @@ func (h *BookHandler) Create(c *gin.Context) {
 		Year:     request.Year,
 	}
 
-	book, err := h.service.Create(ctx, book)
+	createdBook, err := h.service.Create(ctx, book)
 	if err != nil {
+		slog.ErrorContext(ctx, "failed to create book",
+			slog.Any("error", err),
+		)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"message": err.Error(),
+			"message": domain.ErrInternalServer.Error(),
 		})
 		return
 	}
+
+	slog.InfoContext(ctx, "created book",
+		slog.Group("book",
+			slog.Int("book_id", createdBook.ID),
+			slog.Int("year", createdBook.Year),
+			slog.String("title", createdBook.Title),
+			slog.Int("author_id", createdBook.AuthorID),
+		),
+	)
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Book created",
-		"data":    book,
+		"data":    createdBook,
 	})
 }
 func (h *BookHandler) CreateBookWithNewAuthor(c *gin.Context) {
@@ -96,8 +133,11 @@ func (h *BookHandler) CreateBookWithNewAuthor(c *gin.Context) {
 	var request dto.CreateBookWithAuthorRequest
 
 	if err := c.ShouldBindJSON(&request); err != nil {
+		slog.ErrorContext(ctx, "invalid request body",
+			slog.Any("error", err),
+		)
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message": "Invalid Book Data",
+			"message": domain.ErrInvalidBookData.Error(),
 		})
 		return
 	}
@@ -113,11 +153,26 @@ func (h *BookHandler) CreateBookWithNewAuthor(c *gin.Context) {
 
 	createdBook, err := h.service.CreateBookWithNewAuthor(ctx, book, author)
 	if err != nil {
+		slog.ErrorContext(ctx, "failed to create book with new author",
+			slog.Any("error", err),
+		)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"message": err.Error(),
+			"message": domain.ErrInternalServer.Error(),
 		})
 		return
 	}
+
+	slog.InfoContext(ctx, "created book with new author",
+		slog.Group("book",
+			slog.Int("book_id", createdBook.ID),
+			slog.Int("year", createdBook.Year),
+			slog.String("title", createdBook.Title),
+			slog.Int("author_id", createdBook.AuthorID),
+			slog.Group("author",
+				slog.String("name", author.Name),
+			),
+		),
+	)
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Book created",
 		"data":    createdBook,
@@ -128,26 +183,41 @@ func (h *BookHandler) DeleteBook(c *gin.Context) {
 	data := c.Param("id")
 	id, err := strconv.Atoi(data)
 	if err != nil {
+		slog.ErrorContext(ctx, "invalid id",
+			slog.String("book_id", data),
+			slog.Any("error", err),
+		)
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message": "Invalid Book Id",
+			"message": domain.ErrInvalidBookID.Error(),
 		})
 		return
 	}
 
 	err = h.service.Delete(ctx, id)
 	if errors.Is(err, domain.ErrBookNotFound) {
+		slog.ErrorContext(ctx, "book not found",
+			slog.Int("book_id", id),
+			slog.Any("error", err),
+		)
 		c.JSON(http.StatusNotFound, gin.H{
-			"message": "Book not found",
+			"message": domain.ErrBookNotFound.Error(),
 		})
 		return
 	}
 
 	if err != nil {
+		slog.ErrorContext(ctx, "failed to delete book",
+			slog.Int("book_id", id),
+			slog.Any("error", err),
+		)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Internal Server Error",
+			"message": domain.ErrInternalServer.Error(),
 		})
 	}
 
+	slog.InfoContext(ctx, "book deleted",
+		slog.Int("book_id", id),
+	)
 	c.Status(http.StatusNoContent)
 }
 func (h *BookHandler) Update(c *gin.Context) {
@@ -155,16 +225,23 @@ func (h *BookHandler) Update(c *gin.Context) {
 	data := c.Param("id")
 	id, err := strconv.Atoi(data)
 	if err != nil {
+		slog.ErrorContext(ctx, "invalid id",
+			slog.String("book_id", data),
+			slog.Any("error", err),
+		)
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message": "Invalid Book Id",
+			"message": domain.ErrInvalidBookID.Error(),
 		})
 		return
 	}
 
 	var request dto.UpdateBookRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
+		slog.ErrorContext(ctx, "invalid request body",
+			slog.Any("error", err),
+		)
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message": "Invalid Book Data",
+			"message": domain.ErrInvalidBookData.Error(),
 		})
 	}
 
@@ -177,17 +254,33 @@ func (h *BookHandler) Update(c *gin.Context) {
 
 	book, err := h.service.Update(ctx, patchBook)
 	if errors.Is(err, domain.ErrBookNotFound) {
+		slog.ErrorContext(ctx, "book not found",
+			slog.Int("book_id", id),
+			slog.Any("error", err),
+		)
 		c.JSON(http.StatusNotFound, gin.H{
-			"message": "Book not found",
+			"message": domain.ErrBookNotFound.Error(),
 		})
 		return
 	}
 	if err != nil {
+		slog.ErrorContext(ctx, "failed to update book",
+			slog.Int("book_id", id),
+			slog.Any("error", err))
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"message": err,
+			"message": domain.ErrInternalServer.Error(),
 		})
 		return
 	}
+
+	slog.InfoContext(ctx, "updated book",
+		slog.Group("new_book",
+			slog.Int("book_id", id),
+			slog.Int("year", book.Year),
+			slog.String("title", book.Title),
+			slog.Int("author_id", book.AuthorID),
+		),
+	)
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Book updated",
 		"data":    book,
