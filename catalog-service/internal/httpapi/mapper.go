@@ -2,21 +2,21 @@ package httpapi
 
 import (
 	"virtual-library/catalog-service/internal/domain"
-	"virtual-library/catalog-service/internal/httpapi/dto"
+	"virtual-library/catalog-service/internal/httpapi/generated"
 )
 
-func toBookResponse(book domain.Book) dto.BookResponse {
-	return dto.BookResponse{
-		ID:       book.ID,
+func toGeneratedBookResponse(book domain.Book) generated.BookResponse {
+	return generated.BookResponse{
+		Id:       book.ID,
 		Title:    book.Title,
+		AuthorId: book.AuthorID,
 		Year:     book.Year,
-		AuthorID: book.AuthorID,
 	}
 }
 
-func toAuthorResponse(author domain.Author) dto.AuthorResponse {
-	return dto.AuthorResponse{
-		ID:   author.ID,
+func toGeneratedAuthorResponse(author domain.Author) generated.AuthorResponse {
+	return generated.AuthorResponse{
+		Id:   author.ID,
 		Name: author.Name,
 	}
 }

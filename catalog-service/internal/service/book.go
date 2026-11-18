@@ -69,7 +69,7 @@ func (s *BookService) Update(ctx context.Context, id int, patch domain.BookPatch
 func (s *BookService) CreateBookWithNewAuthor(ctx context.Context, book domain.Book, author domain.Author) (domain.Book, error) {
 	var createdBook domain.Book
 	err := s.tx.Do(ctx, func(ctx context.Context) error {
-		createdAuthor, err := s.repoAuthor.Create(ctx, author)
+		createdAuthor, err := s.repoAuthor.GetOrCreate(ctx, author)
 		if err != nil {
 			return fmt.Errorf("create author: %w", err)
 		}

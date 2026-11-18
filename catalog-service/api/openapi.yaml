@@ -153,6 +153,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -289,15 +291,15 @@ components:
           type: integer
         title:
           type: string
-        author_id:
-          type: integer
         year:
+          type: integer
+        author_id:
           type: integer
       required:
         - id
         - title
-        - author_id
         - year
+        - author_id
 
     AuthorResponse:
       type: object
@@ -345,6 +347,7 @@ components:
           type: string
         year:
           type: integer
+          minimum: 1
         author_name:
           type: string
       required:
@@ -400,6 +403,13 @@ components:
 
     NotFound:
       description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Conflict:
+      description: Конфликт
       content:
         application/json:
           schema:

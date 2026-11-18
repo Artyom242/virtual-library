@@ -12,10 +12,15 @@ var (
 
 // authors
 var (
-	ErrAuthorNotFound    = errors.New("author not found")
-	ErrInvalidAuthorID   = errors.New("invalid author id")
-	ErrInvalidAuthorData = errors.New("invalid author data")
-	ErrEmptyAuthorPatch  = errors.New("empty author patch")
+	ErrAuthorNotFound      = errors.New("author not found")
+	ErrInvalidAuthorID     = errors.New("invalid author id")
+	ErrInvalidAuthorData   = errors.New("invalid author data")
+	ErrEmptyAuthorPatch    = errors.New("empty author patch")
+	ErrAuthorHasBooks      = errors.New("author has books")
+	ErrAuthorAlreadyExists = errors.New("author already exists")
 )
 
-var ErrInternalServer = errors.New("internal server error")
+// other
+var (
+	ErrInternalServer = errors.New("internal server error")
+)

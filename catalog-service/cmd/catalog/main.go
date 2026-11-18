@@ -45,13 +45,11 @@ func main() {
 	tx := postgres.NewPgxTransactor(pool)
 	// Author process
 	authorRepo := postgres.NewAuthorRepository(pool)
-	authorService := service.NewAuthorService(authorRepo)
-	authorHandler := httpapi.NewAuthorHandler(authorService)
+	authorService := service.NewAuthorService(tx, authorRepo)
 	// Book process
 	bookRepo := postgres.NewBookRepository(pool)
 	bookService := service.NewService(tx, bookRepo, authorRepo)
-	bookHandler := httpapi.NewBookHandler(bookService)
-	router := httpapi.NewRouter(bookHandler, authorHandler)
+	router := httpapi.NewRouter(bookService, authorService)
 
 	err = router.Run(":8080")
 	if err != nil {

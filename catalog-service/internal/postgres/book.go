@@ -36,10 +36,10 @@ func (b *BookRepository) Create(ctx context.Context, book domain.Book) (domain.B
 
 func (b *BookRepository) GetByID(ctx context.Context, bookID int) (*domain.Book, error) {
 	db := txFromContext(ctx, b.pool)
-	query := "SELECT * FROM books WHERE id = $1"
+	query := "SELECT id, title, year, author_id FROM books WHERE id = $1"
 	var book domain.Book
 
-	err := db.QueryRow(ctx, query, bookID).Scan()
+	err := db.QueryRow(ctx, query, bookID).Scan(&book.ID, &book.Title, &book.Year, &book.AuthorID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, domain.ErrBookNotFound
 	}
