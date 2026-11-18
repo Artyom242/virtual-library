@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"virtual-library/catalog-service/internal/domain"
 )
@@ -25,6 +26,14 @@ func NewService(
 }
 
 func (s *BookService) Create(ctx context.Context, book domain.Book) (domain.Book, error) {
+	_, err := s.repoAuthor.GetByID(ctx, book.AuthorID)
+	if errors.Is(err, domain.ErrAuthorNotFound) {
+		return domain.Book{}, domain.ErrAuthorNotFound
+	}
+	if err != nil {
+		return domain.Book{}, err
+	}
+
 	return s.repoBook.Create(ctx, book)
 }
 
@@ -40,9 +49,21 @@ func (s *BookService) Delete(ctx context.Context, id int) error {
 	return s.repoBook.Delete(ctx, id)
 }
 
-func (s *BookService) Update(ctx context.Context, book domain.Book) (domain.Book, error) {
+func (s *BookService) Update(ctx context.Context, id int, patch domain.BookPatch) (domain.Book, error) {
+	if patch.Title == nil && patch.AuthorID == nil && patch.Year == nil {
+		return domain.Book{}, domain.ErrEmptyBookPatch
+	}
 
-	return s.repoBook.Update(ctx, book)
+	if patch.AuthorID != nil {
+		_, err := s.repoAuthor.GetByID(ctx, *patch.AuthorID)
+		if errors.Is(err, domain.ErrAuthorNotFound) {
+			return domain.Book{}, domain.ErrAuthorNotFound
+		}
+		if err != nil {
+			return domain.Book{}, fmt.Errorf("check author: %w", err)
+		}
+	}
+	return s.repoBook.Update(ctx, id, patch)
 }
 
 func (s *BookService) CreateBookWithNewAuthor(ctx context.Context, book domain.Book, author domain.Author) (domain.Book, error) {

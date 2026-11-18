@@ -6,3 +6,9 @@ type Book struct {
 	AuthorID int
 	Year     int
 }
+
+type BookPatch struct {
+	Title    *string
+	AuthorID *int
+	Year     *int
+}

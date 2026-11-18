@@ -1,0 +1,413 @@
+openapi: 3.0.3
+
+info:
+  title: Virtual Library Catalog API
+  version: 1.0.0
+  description: API для управления книгами и авторами библиотеки.
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+tags:
+  - name: Books
+    description: Управление книгами
+  - name: Authors
+    description: Управление авторами
+
+paths:
+  /books:
+    get:
+      tags:
+        - Books
+      summary: Получить список книг
+      operationId: getBooks
+      responses:
+        '200':
+          description: Список книг получен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BookResponse'
+                required:
+                  - data
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - Books
+      summary: Создать книгу
+      operationId: createBook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBookRequest'
+      responses:
+        '201':
+          description: Книга создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookMutationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+            $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /books/with-author:
+    post:
+      tags:
+        - Books
+      summary: Создать книгу вместе с новым автором
+      operationId: createBookWithAuthor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBookWithAuthorRequest'
+      responses:
+        '201':
+          description: Книга и автор созданы
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookMutationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /books/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ID'
+
+    get:
+      tags:
+        - Books
+      summary: Получить книгу по ID
+      operationId: getBookById
+      responses:
+        '200':
+          description: Книга найдена
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/BookResponse'
+                required:
+                  - data
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    patch:
+      tags:
+        - Books
+      summary: Частично обновить книгу
+      operationId: updateBook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBookRequest'
+      responses:
+        '200':
+          description: Книга обновлена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookMutationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - Books
+      summary: Удалить книгу
+      operationId: deleteBook
+      responses:
+        '204':
+          description: Книга удалена
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /authors:
+    get:
+      tags:
+        - Authors
+      summary: Получить список авторов
+      operationId: getAuthors
+      responses:
+        '200':
+          description: Список авторов получен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuthorResponse'
+                required:
+                  - data
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - Authors
+      summary: Создать автора
+      operationId: createAuthor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAuthorRequest'
+      responses:
+        '201':
+          description: Автор создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthorMutationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /authors/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ID'
+
+    get:
+      tags:
+        - Authors
+      summary: Получить автора по ID
+      operationId: getAuthorById
+      responses:
+        '200':
+          description: Автор найден
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AuthorResponse'
+                required:
+                  - data
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    patch:
+      tags:
+        - Authors
+      summary: Частично обновить автора
+      operationId: updateAuthor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAuthorRequest'
+      responses:
+        '200':
+          description: Автор обновлён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthorMutationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - Authors
+      summary: Удалить автора
+      operationId: deleteAuthor
+      responses:
+        '204':
+          description: Автор удалён
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  parameters:
+    ID:
+      name: id
+      in: path
+      required: true
+      description: Идентификатор ресурса
+      schema:
+        type: integer
+        minimum: 1
+
+  schemas:
+    BookResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        author_id:
+          type: integer
+        year:
+          type: integer
+      required:
+        - id
+        - title
+        - author_id
+        - year
+
+    AuthorResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+        - id
+        - name
+
+    CreateBookRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        author_id:
+          type: integer
+          minimum: 1
+        year:
+          type: integer
+          minimum: 1
+      required:
+        - title
+        - author_id
+        - year
+
+    UpdateBookRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        author_id:
+          type: integer
+          minimum: 1
+        year:
+          type: integer
+          minimum: 1
+
+    CreateBookWithAuthorRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        year:
+          type: integer
+        author_name:
+          type: string
+      required:
+        - title
+        - year
+        - author_name
+
+    CreateAuthorRequest:
+      type: object
+      properties:
+        name:
+          type: string
+      required:
+        - name
+
+    UpdateAuthorRequest:
+      type: object
+      properties:
+        name:
+          type: string
+
+    BookMutationResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/BookResponse'
+      required:
+        - data
+
+    AuthorMutationResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/AuthorResponse'
+      required:
+        - data
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    InternalServerError:
+      description: Внутренняя ошибка сервера
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

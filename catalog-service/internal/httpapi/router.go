@@ -10,8 +10,9 @@ func NewRouter(bookHandler *BookHandler, authorHandler *AuthorHandler) *gin.Engi
 		books.GET("", bookHandler.GetAll)
 		books.GET("/:id", bookHandler.GetByID)
 		books.POST("", bookHandler.Create)
-		books.POST("/with-author", bookHandler.Create)
+		books.POST("/with-author", bookHandler.CreateBookWithNewAuthor)
 		books.DELETE("/:id", bookHandler.DeleteBook)
+		books.PATCH("/:id", bookHandler.Update)
 	}
 
 	authors := router.Group("/authors")
@@ -20,6 +21,7 @@ func NewRouter(bookHandler *BookHandler, authorHandler *AuthorHandler) *gin.Engi
 		authors.GET("/:id", authorHandler.GetByID)
 		authors.POST("", authorHandler.Create)
 		authors.DELETE("/:id", authorHandler.Delete)
+		authors.PATCH("/:id", authorHandler.Update)
 	}
 
 	return router

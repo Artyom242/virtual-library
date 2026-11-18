@@ -25,7 +25,7 @@ func NewBookRepository(pool *pgxpool.Pool) *BookRepository {
 func (b *BookRepository) Create(ctx context.Context, book domain.Book) (domain.Book, error) {
 	db := txFromContext(ctx, b.pool)
 	query := "INSERT INTO books(title, author_id, year) VALUES($1, $2, $3) returning id, title, author_id, year;"
-	err := db.QueryRow(ctx, query, book.ID, book.Title, book.AuthorID, book.Year).Scan(&book.ID, &book.Title, &book.AuthorID, &book.Year)
+	err := db.QueryRow(ctx, query, book.Title, book.AuthorID, book.Year).Scan(&book.ID, &book.Title, &book.AuthorID, &book.Year)
 
 	if err != nil {
 		return book, fmt.Errorf("create book: %w", err)
@@ -82,15 +82,18 @@ func (b *BookRepository) Delete(ctx context.Context, bookID int) error {
 	return nil
 }
 
-func (b *BookRepository) Update(ctx context.Context, book domain.Book) (domain.Book, error) {
+func (b *BookRepository) Update(ctx context.Context, id int, patch domain.BookPatch) (domain.Book, error) {
 	db := txFromContext(ctx, b.pool)
 	query := `
-			UPDATE books
-			SET title = $1, author_id = $2, year = $3
-			WHERE id = $4
-			RETURNING id, title, author_id, year
-		`
-	err := db.QueryRow(ctx, query, book.Title, book.AuthorID, book.Year, book.ID).
+        UPDATE books
+        SET title     = COALESCE($1, title),
+            author_id = COALESCE($2, author_id),
+            year      = COALESCE($3, year)
+        WHERE id = $4
+        RETURNING id, title, author_id, year
+    `
+	var book domain.Book
+	err := db.QueryRow(ctx, query, patch.Title, patch.AuthorID, patch.Year, id).
 		Scan(&book.ID, &book.Title, &book.AuthorID, &book.Year)
 
 	if err != nil {

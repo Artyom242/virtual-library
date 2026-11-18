@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"virtual-library/catalog-service/internal/domain"
 )
 
@@ -27,18 +26,9 @@ func (svc *AuthorService) GetByID(ctx context.Context, id int) (*domain.Author, 
 	return svc.repo.GetByID(ctx, id)
 }
 func (svc *AuthorService) Update(ctx context.Context, id int, patch domain.AuthorPatch) (domain.Author, error) {
-	author, err := svc.repo.GetByID(ctx, id)
-
-	if errors.Is(err, domain.ErrAuthorNotFound) {
-		return domain.Author{}, domain.ErrAuthorNotFound
-	}
-	if err != nil {
-		return domain.Author{}, err
+	if patch.Name == nil {
+		return domain.Author{}, domain.ErrEmptyAuthorPatch
 	}
 
-	if patch.Name != nil {
-		author.Name = *patch.Name
-	}
-
-	return svc.repo.Update(ctx, *author)
+	return svc.repo.Update(ctx, id, patch)
 }

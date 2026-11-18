@@ -6,9 +6,9 @@ type CreateBookRequest struct {
 	Year     int    `json:"year" binding:"required,min=1"`
 }
 type UpdateBookRequest struct {
-	Title    *string `json:"title"`
-	AuthorID *int    `json:"author_id"`
-	Year     *int    `json:"year"`
+	Title    *string `json:"title" binding:"omitempty,min=1"`
+	AuthorID *int    `json:"author_id" binding:"omitempty,min=1"`
+	Year     *int    `json:"year" binding:"omitempty,min=1"`
 }
 
 type CreateBookWithAuthorRequest struct {

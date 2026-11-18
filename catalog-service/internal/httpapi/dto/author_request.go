@@ -5,5 +5,5 @@ type CreateAuthorRequest struct {
 }
 
 type UpdateAuthorRequest struct {
-	Name *string `json:"name"`
+	Name *string `json:"name" binding:"omitempty,min=1"`
 }

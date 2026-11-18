@@ -22,7 +22,7 @@ var _ domain.AuthorRepository = (*AuthorRepository)(nil)
 
 func (a *AuthorRepository) Create(c context.Context, author domain.Author) (domain.Author, error) {
 	db := txFromContext(c, a.pool)
-	query := "INSERT INTO authors(name) VALUES($1)"
+	query := "INSERT INTO authors(name) VALUES($1) returning id, name"
 	err := db.QueryRow(c, query, author.Name).Scan(&author.ID, &author.Name)
 	if err != nil {
 		return domain.Author{}, fmt.Errorf("create author: %w", err)
@@ -74,10 +74,15 @@ func (a *AuthorRepository) Delete(c context.Context, authorID int) error {
 	return nil
 }
 
-func (a *AuthorRepository) Update(c context.Context, author domain.Author) (domain.Author, error) {
+func (a *AuthorRepository) Update(c context.Context, id int, patch domain.AuthorPatch) (domain.Author, error) {
 	db := txFromContext(c, a.pool)
-	query := "UPDATE authors SET name = $1 WHERE id = $2 returning id, name"
-	err := db.QueryRow(c, query, author.Name, author.ID).Scan(&author.ID, &author.Name)
+	var author domain.Author
+
+	query := `UPDATE authors 
+		SET name = COALESCE($1, name) 
+		WHERE id = $2 
+		RETURNING id, name`
+	err := db.QueryRow(c, query, patch.Name, id).Scan(&author.ID, &author.Name)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
