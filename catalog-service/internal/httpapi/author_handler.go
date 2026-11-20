@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"net/http"
 	"virtual-library/catalog-service/internal/domain"
-	"virtual-library/catalog-service/internal/httpapi/dto"
 	"virtual-library/catalog-service/internal/httpapi/generated"
 	"virtual-library/catalog-service/internal/service"
 
@@ -24,12 +23,41 @@ func NewAuthorHandler(service *service.AuthorService) *AuthorHandler {
 
 func (h *AuthorHandler) GetAuthors(c *gin.Context) {
 	ctx := c.Request.Context()
-	authors, err := h.service.GetAll(ctx)
+	var request generated.GetAuthorsRequestObject
+
+	if err := c.ShouldBindQuery(&request); err != nil {
+		slog.WarnContext(ctx, "invalid request query",
+			slog.Any("error", err),
+		)
+		c.JSON(http.StatusBadRequest, generated.ErrorResponse{Message: domain.ErrInvalidAuthorData.Error()})
+		return
+	}
+
+	page := 1
+	if request.Params.Page != nil {
+		page = *request.Params.Page
+	}
+
+	limit := 10
+	if request.Params.Limit != nil {
+		limit = *request.Params.Limit
+	}
+
+	if page < 1 || limit < 1 || limit > 100 {
+		slog.WarnContext(ctx, "invalid request query",
+			slog.Int("page", page),
+			slog.Int("limit", limit),
+		)
+		c.JSON(http.StatusBadRequest, generated.ErrorResponse{Message: domain.ErrInvalidAuthorData.Error()})
+		return
+	}
+
+	authors, total, err := h.service.GetAll(ctx, page, limit)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to get all authors",
 			slog.Any("error", err),
 		)
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Message: domain.ErrInternalServer.Error()})
+		c.JSON(http.StatusInternalServerError, generated.ErrorResponse{Message: domain.ErrInternalServer.Error()})
 		return
 	}
 
@@ -40,8 +68,12 @@ func (h *AuthorHandler) GetAuthors(c *gin.Context) {
 
 	slog.InfoContext(ctx, "got all authors",
 		slog.Int("count", len(authors)),
+		slog.Int("total", total),
 	)
-	c.JSON(http.StatusOK, generated.GetAuthors200JSONResponse{Data: response})
+	c.JSON(http.StatusOK, generated.GetAuthors200JSONResponse{
+		Data:  response,
+		Total: total,
+	})
 }
 
 func (h *AuthorHandler) CreateAuthor(c *gin.Context) {
@@ -52,34 +84,54 @@ func (h *AuthorHandler) CreateAuthor(c *gin.Context) {
 		slog.WarnContext(ctx, "invalid request body",
 			slog.Any("error", err),
 		)
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Message: domain.ErrInvalidAuthorData.Error()})
+		c.JSON(http.StatusBadRequest, generated.ErrorResponse{Message: domain.ErrInvalidAuthorData.Error()})
 		return
 	}
 
-	author := domain.Author{
-		Name: request.Name,
+	author, err := domain.NewAuthor(request.Name)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidAuthorData) {
+			slog.WarnContext(ctx, "invalid request body",
+				slog.Any("error", err),
+			)
+			c.JSON(http.StatusBadRequest, generated.ErrorResponse{Message: domain.ErrInvalidAuthorData.Error()})
+			return
+		}
+		slog.ErrorContext(ctx, "server internal error",
+			slog.Any("error", err),
+		)
+		c.JSON(http.StatusInternalServerError, generated.ErrorResponse{Message: domain.ErrInternalServer.Error()})
+		return
 	}
 
 	createdAuthor, err := h.service.Create(ctx, author)
-	if errors.Is(err, domain.ErrAuthorAlreadyExists) {
-		slog.ErrorContext(ctx, "author already exists",
-			slog.String("author_name", author.Name),
-		)
-		c.JSON(http.StatusConflict, dto.ErrorResponse{Message: domain.ErrAuthorAlreadyExists.Error()})
-		return
-	}
 	if err != nil {
+		if errors.Is(err, domain.ErrAuthorAlreadyExists) {
+			slog.WarnContext(ctx, "author already exists",
+				slog.String("author_name", author.Name()),
+			)
+			c.JSON(http.StatusConflict, generated.ErrorResponse{Message: domain.ErrAuthorAlreadyExists.Error()})
+			return
+		}
+		if errors.Is(err, domain.ErrMapAuthorToDomain) {
+			slog.ErrorContext(ctx, "failed to map author to domain",
+				slog.String("author_name", author.Name()),
+			)
+			c.JSON(http.StatusInternalServerError, generated.ErrorResponse{Message: domain.ErrMapAuthorToDomain.Error()})
+			return
+		}
+
 		slog.ErrorContext(ctx, "failed to create author",
 			slog.Any("error", err),
 		)
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Message: domain.ErrInternalServer.Error()})
+		c.JSON(http.StatusInternalServerError, generated.ErrorResponse{Message: domain.ErrInternalServer.Error()})
 		return
 	}
 
 	slog.InfoContext(ctx, "created author",
 		slog.Group("author",
-			slog.Int("id", createdAuthor.ID),
-			slog.String("name", createdAuthor.Name),
+			slog.Int("id", createdAuthor.ID()),
+			slog.String("name", createdAuthor.Name()),
 		),
 	)
 	c.JSON(http.StatusCreated, generated.CreateAuthor201JSONResponse{Data: toGeneratedAuthorResponse(createdAuthor)})
@@ -88,7 +140,7 @@ func (h *AuthorHandler) CreateAuthor(c *gin.Context) {
 func (h *AuthorHandler) GetAuthorById(c *gin.Context, id generated.ID) {
 	ctx := c.Request.Context()
 	if id < 1 {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+		c.JSON(http.StatusBadRequest, generated.ErrorResponse{
 			Message: domain.ErrInvalidAuthorID.Error(),
 		})
 		return
@@ -96,26 +148,27 @@ func (h *AuthorHandler) GetAuthorById(c *gin.Context, id generated.ID) {
 
 	author, err := h.service.GetByID(ctx, id)
 
-	if errors.Is(err, domain.ErrAuthorNotFound) {
-		slog.WarnContext(ctx, "author not found",
-			slog.Int("author_id", id),
-		)
-		c.JSON(http.StatusNotFound, dto.ErrorResponse{Message: domain.ErrAuthorNotFound.Error()})
-		return
-	}
 	if err != nil {
+		if errors.Is(err, domain.ErrAuthorNotFound) {
+			slog.WarnContext(ctx, "author not found",
+				slog.Int("author_id", id),
+			)
+			c.JSON(http.StatusNotFound, generated.ErrorResponse{Message: domain.ErrAuthorNotFound.Error()})
+			return
+		}
+
 		slog.ErrorContext(ctx, "failed to get author by id",
 			slog.Int("author_id", id),
 			slog.Any("error", err),
 		)
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Message: domain.ErrInternalServer.Error()})
+		c.JSON(http.StatusInternalServerError, generated.ErrorResponse{Message: domain.ErrInternalServer.Error()})
 		return
 	}
 
 	slog.InfoContext(ctx, "author found",
 		slog.Group("author",
-			slog.Int("id", author.ID),
-			slog.String("name", author.Name),
+			slog.Int("id", author.ID()),
+			slog.String("name", author.Name()),
 		),
 	)
 	c.JSON(http.StatusOK, generated.GetAuthorById200JSONResponse{Data: toGeneratedAuthorResponse(*author)})
@@ -124,7 +177,7 @@ func (h *AuthorHandler) GetAuthorById(c *gin.Context, id generated.ID) {
 func (h *AuthorHandler) UpdateAuthor(c *gin.Context, id generated.ID) {
 	ctx := c.Request.Context()
 	if id < 1 {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+		c.JSON(http.StatusBadRequest, generated.ErrorResponse{
 			Message: domain.ErrInvalidAuthorID.Error(),
 		})
 		return
@@ -135,7 +188,7 @@ func (h *AuthorHandler) UpdateAuthor(c *gin.Context, id generated.ID) {
 		slog.WarnContext(ctx, "invalid request body",
 			slog.Any("error", err),
 		)
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Message: domain.ErrInvalidAuthorData.Error()})
+		c.JSON(http.StatusBadRequest, generated.ErrorResponse{Message: domain.ErrInvalidAuthorData.Error()})
 		return
 	}
 
@@ -147,21 +200,21 @@ func (h *AuthorHandler) UpdateAuthor(c *gin.Context, id generated.ID) {
 		slog.WarnContext(ctx, "empty author patch",
 			slog.Int("author_id", id),
 		)
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Message: domain.ErrEmptyAuthorPatch.Error()})
+		c.JSON(http.StatusBadRequest, generated.ErrorResponse{Message: domain.ErrEmptyAuthorPatch.Error()})
 		return
 	}
 	if errors.Is(err, domain.ErrAuthorNotFound) {
 		slog.WarnContext(ctx, "author not found",
 			slog.Int("author_id", id),
 		)
-		c.JSON(http.StatusNotFound, dto.ErrorResponse{Message: domain.ErrAuthorNotFound.Error()})
+		c.JSON(http.StatusNotFound, generated.ErrorResponse{Message: domain.ErrAuthorNotFound.Error()})
 		return
 	}
 	if errors.Is(err, domain.ErrAuthorAlreadyExists) {
 		slog.ErrorContext(ctx, "author already exists",
-			slog.String("author_name", author.Name),
+			slog.String("author_name", author.Name()),
 		)
-		c.JSON(http.StatusConflict, dto.ErrorResponse{Message: domain.ErrAuthorAlreadyExists.Error()})
+		c.JSON(http.StatusConflict, generated.ErrorResponse{Message: domain.ErrAuthorAlreadyExists.Error()})
 		return
 	}
 	if err != nil {
@@ -169,14 +222,14 @@ func (h *AuthorHandler) UpdateAuthor(c *gin.Context, id generated.ID) {
 			slog.Int("author_id", id),
 			slog.Any("error", err),
 		)
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Message: domain.ErrInternalServer.Error()})
+		c.JSON(http.StatusInternalServerError, generated.ErrorResponse{Message: domain.ErrInternalServer.Error()})
 		return
 	}
 
 	slog.InfoContext(ctx, "updated author",
 		slog.Group("author",
 			slog.Int("id", id),
-			slog.String("name", author.Name),
+			slog.String("name", author.Name()),
 		),
 	)
 	c.JSON(http.StatusOK, generated.UpdateAuthor200JSONResponse{Data: toGeneratedAuthorResponse(author)})
@@ -185,7 +238,7 @@ func (h *AuthorHandler) UpdateAuthor(c *gin.Context, id generated.ID) {
 func (h *AuthorHandler) DeleteAuthor(c *gin.Context, id generated.ID) {
 	ctx := c.Request.Context()
 	if id < 1 {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+		c.JSON(http.StatusBadRequest, generated.ErrorResponse{
 			Message: domain.ErrInvalidAuthorID.Error(),
 		})
 		return
@@ -196,14 +249,14 @@ func (h *AuthorHandler) DeleteAuthor(c *gin.Context, id generated.ID) {
 		slog.WarnContext(ctx, "author not found",
 			slog.Int("author_id", id),
 		)
-		c.JSON(http.StatusNotFound, dto.ErrorResponse{Message: domain.ErrAuthorNotFound.Error()})
+		c.JSON(http.StatusNotFound, generated.ErrorResponse{Message: domain.ErrAuthorNotFound.Error()})
 		return
 	}
 	if errors.Is(err, domain.ErrAuthorHasBooks) {
 		slog.WarnContext(ctx, "author has books, cannot delete",
 			slog.Int("author_id", id),
 		)
-		c.JSON(http.StatusConflict, dto.ErrorResponse{Message: domain.ErrAuthorHasBooks.Error()})
+		c.JSON(http.StatusConflict, generated.ErrorResponse{Message: domain.ErrAuthorHasBooks.Error()})
 		return
 	}
 	if err != nil {
@@ -211,7 +264,7 @@ func (h *AuthorHandler) DeleteAuthor(c *gin.Context, id generated.ID) {
 			slog.Int("author_id", id),
 			slog.Any("error", err),
 		)
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Message: domain.ErrInternalServer.Error()})
+		c.JSON(http.StatusInternalServerError, generated.ErrorResponse{Message: domain.ErrInternalServer.Error()})
 		return
 	}
 

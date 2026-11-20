@@ -18,6 +18,7 @@ var (
 	ErrEmptyAuthorPatch    = errors.New("empty author patch")
 	ErrAuthorHasBooks      = errors.New("author has books")
 	ErrAuthorAlreadyExists = errors.New("author already exists")
+	ErrMapAuthorToDomain   = errors.New("failed to map author to domain")
 )
 
 // other

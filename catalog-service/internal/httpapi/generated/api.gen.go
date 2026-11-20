@@ -33,10 +33,12 @@ type BookMutationResponse struct {
 
 // BookResponse defines model for BookResponse.
 type BookResponse struct {
-	AuthorId int    `json:"author_id"`
-	Id       int    `json:"id"`
-	Title    string `json:"title"`
-	Year     int    `json:"year"`
+	AuthorId    int           `json:"author_id"`
+	Categories  []interface{} `json:"categories"`
+	Description *string       `json:"description,omitempty"`
+	Id          int           `json:"id"`
+	Title       string        `json:"title"`
+	Year        int           `json:"year"`
 }
 
 // CreateAuthorRequest defines model for CreateAuthorRequest.
@@ -46,9 +48,11 @@ type CreateAuthorRequest struct {
 
 // CreateBookRequest defines model for CreateBookRequest.
 type CreateBookRequest struct {
-	AuthorId int    `json:"author_id"`
-	Title    string `json:"title"`
-	Year     int    `json:"year"`
+	AuthorId    int     `json:"author_id"`
+	CategoryIds *[]int  `json:"category_ids,omitempty"`
+	Description *string `json:"description,omitempty"`
+	Title       string  `json:"title"`
+	Year        int     `json:"year"`
 }
 
 // CreateBookWithAuthorRequest defines model for CreateBookWithAuthorRequest.
@@ -78,6 +82,12 @@ type UpdateBookRequest struct {
 // ID defines model for ID.
 type ID = int
 
+// Limit defines model for Limit.
+type Limit = int
+
+// Page defines model for Page.
+type Page = int
+
 // BadRequest defines model for BadRequest.
 type BadRequest = ErrorResponse
 
@@ -89,6 +99,18 @@ type InternalServerError = ErrorResponse
 
 // NotFound defines model for NotFound.
 type NotFound = ErrorResponse
+
+// GetAuthorsParams defines parameters for GetAuthors.
+type GetAuthorsParams struct {
+	Page  *Page  `form:"page,omitempty" json:"page,omitempty"`
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// GetBooksParams defines parameters for GetBooks.
+type GetBooksParams struct {
+	Page  *Page  `form:"page,omitempty" json:"page,omitempty"`
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
 
 // CreateAuthorJSONRequestBody defines body for CreateAuthor for application/json ContentType.
 type CreateAuthorJSONRequestBody = CreateAuthorRequest
@@ -109,7 +131,7 @@ type UpdateBookJSONRequestBody = UpdateBookRequest
 type ServerInterface interface {
 	// GetAuthors Получить список авторов
 	// (GET /authors)
-	GetAuthors(c *gin.Context)
+	GetAuthors(c *gin.Context, params GetAuthorsParams)
 	// CreateAuthor Создать автора
 	// (POST /authors)
 	CreateAuthor(c *gin.Context)
@@ -124,7 +146,7 @@ type ServerInterface interface {
 	UpdateAuthor(c *gin.Context, id ID)
 	// GetBooks Получить список книг
 	// (GET /books)
-	GetBooks(c *gin.Context)
+	GetBooks(c *gin.Context, params GetBooksParams)
 	// CreateBook Создать книгу
 	// (POST /books)
 	CreateBook(c *gin.Context)
@@ -154,6 +176,28 @@ type MiddlewareFunc func(c *gin.Context)
 // GetAuthors operation middleware
 func (siw *ServerInterfaceWrapper) GetAuthors(c *gin.Context) {
 
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAuthorsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", c.Request.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter page: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", c.Request.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter limit: %w", err), http.StatusBadRequest)
+		return
+	}
+
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
 		if c.IsAborted() {
@@ -161,7 +205,7 @@ func (siw *ServerInterfaceWrapper) GetAuthors(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.GetAuthors(c)
+	siw.Handler.GetAuthors(c, params)
 }
 
 // CreateAuthor operation middleware
@@ -255,6 +299,28 @@ func (siw *ServerInterfaceWrapper) UpdateAuthor(c *gin.Context) {
 // GetBooks operation middleware
 func (siw *ServerInterfaceWrapper) GetBooks(c *gin.Context) {
 
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetBooksParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", c.Request.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter page: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", c.Request.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter limit: %w", err), http.StatusBadRequest)
+		return
+	}
+
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
 		if c.IsAborted() {
@@ -262,7 +328,7 @@ func (siw *ServerInterfaceWrapper) GetBooks(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.GetBooks(c)
+	siw.Handler.GetBooks(c, params)
 }
 
 // CreateBook operation middleware
@@ -415,6 +481,7 @@ type InternalServerErrorJSONResponse ErrorResponse
 type NotFoundJSONResponse ErrorResponse
 
 type GetAuthorsRequestObject struct {
+	Params GetAuthorsParams
 }
 
 type GetAuthorsResponseObject interface {
@@ -422,7 +489,8 @@ type GetAuthorsResponseObject interface {
 }
 
 type GetAuthors200JSONResponse struct {
-	Data []AuthorResponse `json:"data"`
+	Data  []AuthorResponse `json:"data"`
+	Total int              `json:"total"`
 }
 
 func (response GetAuthors200JSONResponse) VisitGetAuthorsResponse(w http.ResponseWriter) error {
@@ -701,6 +769,7 @@ func (response UpdateAuthor500JSONResponse) VisitUpdateAuthorResponse(w http.Res
 }
 
 type GetBooksRequestObject struct {
+	Params GetBooksParams
 }
 
 type GetBooksResponseObject interface {
@@ -708,7 +777,8 @@ type GetBooksResponseObject interface {
 }
 
 type GetBooks200JSONResponse struct {
-	Data []BookResponse `json:"data"`
+	Data  []BookResponse `json:"data"`
+	Total int            `json:"total"`
 }
 
 func (response GetBooks200JSONResponse) VisitGetBooksResponse(w http.ResponseWriter) error {
@@ -1161,8 +1231,10 @@ type strictHandler struct {
 }
 
 // GetAuthors operation middleware
-func (sh *strictHandler) GetAuthors(ctx *gin.Context) {
+func (sh *strictHandler) GetAuthors(ctx *gin.Context, params GetAuthorsParams) {
 	var request GetAuthorsRequestObject
+
+	request.Params = params
 
 	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
 		return sh.ssi.GetAuthors(ctx, request.(GetAuthorsRequestObject))
@@ -1323,8 +1395,10 @@ func (sh *strictHandler) UpdateAuthor(ctx *gin.Context, id ID) {
 }
 
 // GetBooks operation middleware
-func (sh *strictHandler) GetBooks(ctx *gin.Context) {
+func (sh *strictHandler) GetBooks(ctx *gin.Context, params GetBooksParams) {
 	var request GetBooksRequestObject
+
+	request.Params = params
 
 	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
 		return sh.ssi.GetBooks(ctx, request.(GetBooksRequestObject))

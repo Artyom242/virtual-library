@@ -32,8 +32,8 @@ func (svc *AuthorService) Delete(ctx context.Context, id int) error {
 	})
 }
 
-func (svc *AuthorService) GetAll(ctx context.Context) ([]domain.Author, error) {
-	return svc.repo.GetAll(ctx)
+func (svc *AuthorService) GetAll(ctx context.Context, page int, limit int) ([]domain.Author, int, error) {
+	return svc.repo.GetAll(ctx, page, limit)
 }
 
 func (svc *AuthorService) GetByID(ctx context.Context, id int) (*domain.Author, error) {
