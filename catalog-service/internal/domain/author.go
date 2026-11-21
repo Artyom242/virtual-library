@@ -1,12 +1,14 @@
 package domain
 
+import "strings"
+
 type Author struct {
 	id   int
 	name string
 }
 
 func NewAuthor(name string) (Author, error) {
-	if name == "" {
+	if strings.TrimSpace(name) == "" {
 		return Author{}, ErrInvalidAuthorData
 	}
 

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"virtual-library/catalog-service/internal/domain"
 )
 
@@ -41,8 +42,8 @@ func (svc *AuthorService) GetByID(ctx context.Context, id int) (*domain.Author, 
 }
 
 func (svc *AuthorService) Update(ctx context.Context, id int, patch domain.AuthorPatch) (domain.Author, error) {
-	if patch.Name == nil {
-		return domain.Author{}, domain.ErrEmptyAuthorPatch
+	if patch.Name != nil && strings.TrimSpace(*patch.Name) == "" {
+		return domain.Author{}, domain.ErrInvalidAuthorData
 	}
 
 	return svc.repo.Update(ctx, id, patch)

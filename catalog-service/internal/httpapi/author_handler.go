@@ -21,34 +21,17 @@ func NewAuthorHandler(service *service.AuthorService) *AuthorHandler {
 	}
 }
 
-func (h *AuthorHandler) GetAuthors(c *gin.Context) {
+func (h *AuthorHandler) GetAuthors(c *gin.Context, params generated.GetAuthorsParams) {
 	ctx := c.Request.Context()
-	var request generated.GetAuthorsRequestObject
 
-	if err := c.ShouldBindQuery(&request); err != nil {
-		slog.WarnContext(ctx, "invalid request query",
+	page, limit, err := parsePagination(params.Page, params.Limit)
+	if err != nil {
+		slog.WarnContext(ctx, "invalid pagination parameters",
 			slog.Any("error", err),
 		)
-		c.JSON(http.StatusBadRequest, generated.ErrorResponse{Message: domain.ErrInvalidAuthorData.Error()})
-		return
-	}
-
-	page := 1
-	if request.Params.Page != nil {
-		page = *request.Params.Page
-	}
-
-	limit := 10
-	if request.Params.Limit != nil {
-		limit = *request.Params.Limit
-	}
-
-	if page < 1 || limit < 1 || limit > 100 {
-		slog.WarnContext(ctx, "invalid request query",
-			slog.Int("page", page),
-			slog.Int("limit", limit),
-		)
-		c.JSON(http.StatusBadRequest, generated.ErrorResponse{Message: domain.ErrInvalidAuthorData.Error()})
+		c.JSON(http.StatusBadRequest, generated.ErrorResponse{
+			Message: domain.ErrInvalidPagination.Error(),
+		})
 		return
 	}
 
@@ -196,6 +179,13 @@ func (h *AuthorHandler) UpdateAuthor(c *gin.Context, id generated.ID) {
 		Name: request.Name,
 	}
 	author, err := h.service.Update(ctx, id, patch)
+	if errors.Is(err, domain.ErrInvalidAuthorData) {
+		slog.WarnContext(ctx, "invalid author data",
+			slog.Int("author_id", id),
+		)
+		c.JSON(http.StatusBadRequest, generated.ErrorResponse{Message: domain.ErrInvalidAuthorData.Error()})
+		return
+	}
 	if errors.Is(err, domain.ErrEmptyAuthorPatch) {
 		slog.WarnContext(ctx, "empty author patch",
 			slog.Int("author_id", id),

@@ -141,28 +141,28 @@ func (a *AuthorRepository) GetOrCreate(ctx context.Context, author domain.Author
 
 	authorRow, err := pgx.CollectOneRow(row, pgx.RowToStructByName[Author])
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			query = `SELECT id, name FROM authors WHERE name = $1`
-
-			row, err = db.Query(ctx, query, author.Name())
-			if err != nil {
-				return domain.Author{}, fmt.Errorf("get author: %w", err)
-			}
-
-			authorRow, err = pgx.CollectOneRow(row, pgx.RowToStructByName[Author])
-			if err != nil {
-				return domain.Author{}, fmt.Errorf("scan author: %w", err)
-			}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return domain.Author{}, fmt.Errorf("scan author: %w", err)
 		}
 
-		return domain.Author{}, fmt.Errorf("get or create author: %w", err)
+		query = `SELECT id, name FROM authors WHERE name = $1`
+		row, err = db.Query(ctx, query, author.Name())
+		if err != nil {
+			return domain.Author{}, fmt.Errorf("get author: %w", err)
+		}
+		defer row.Close()
+
+		authorRow, err = pgx.CollectOneRow(row, pgx.RowToStructByName[Author])
+		if err != nil {
+			return domain.Author{}, fmt.Errorf("scan author: %w", err)
+		}
 	}
 
-	newAuthor, err := toDomainAuthor(authorRow)
+	author, err = toDomainAuthor(authorRow)
 	if err != nil {
 		return domain.Author{}, fmt.Errorf("map author to domain: %w", err)
 	}
-	return newAuthor, nil
+	return author, nil
 }
 
 func (a *AuthorRepository) HasBooks(c context.Context, authorID int) (bool, error) {
