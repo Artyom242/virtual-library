@@ -7,10 +7,11 @@ import (
 	"os"
 	"time"
 	"virtual-library/catalog-service/internal/httpapi"
-	"virtual-library/catalog-service/internal/postgres"
+	"virtual-library/catalog-service/internal/infra/config"
+	pgrs "virtual-library/catalog-service/internal/infra/db/postgres"
+	"virtual-library/catalog-service/internal/repository"
 	"virtual-library/catalog-service/internal/service"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/joho/godotenv"
 )
@@ -19,35 +20,26 @@ func main() {
 	if err := godotenv.Load("../.env"); err != nil {
 		log.Fatal("Error loading .env file")
 	}
-	databaseURL := os.Getenv("DATABASE_URL")
-
-	if databaseURL == "" {
-		log.Fatal("DATABASE_URL environment variable not set")
-	}
-
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 
+	cfg := config.Load()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	pool, err := pgxpool.New(ctx, databaseURL)
+	pool, err := pgrs.NewConnection(ctx, cfg.DatabaseURL)
 	if err != nil {
-		log.Fatal(err)
+		logger.Error("failed to connect to database", slog.Any("error", err))
+		os.Exit(1)
 	}
 	defer pool.Close()
 
-	if err := pool.Ping(ctx); err != nil {
-		log.Fatal("Cannot connect to PostgreSQL:", err)
-	}
-	log.Println("Connected to PostgreSQL")
-
-	tx := postgres.NewPgxTransactor(pool)
+	tx := repository.NewPgxTransactor(pool)
 	// Author process
-	authorRepo := postgres.NewAuthorRepository(pool)
+	authorRepo := repository.NewAuthorRepository(pool)
 	authorService := service.NewAuthorService(tx, authorRepo)
 	// Book process
-	bookRepo := postgres.NewBookRepository(pool)
+	bookRepo := repository.NewBookRepository(pool)
 	bookService := service.NewService(tx, bookRepo, authorRepo)
 	router := httpapi.NewRouter(bookService, authorService)
 

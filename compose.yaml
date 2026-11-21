@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:17
-    container_name: virtual-library-postgres
+    container_name: virtual-library-repository
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}

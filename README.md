@@ -244,7 +244,7 @@ cp .env.example .env
 ### 3. Запустить PostgreSQL
 
 ```bash
-docker compose up -d postgres
+docker compose up -d repository
 ```
 
 Проверить состояние контейнера:
