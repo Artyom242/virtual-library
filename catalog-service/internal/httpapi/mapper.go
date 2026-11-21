@@ -6,17 +6,20 @@ import (
 )
 
 func toGeneratedBookResponse(book domain.Book) generated.BookResponse {
+	description := book.Description()
+
 	return generated.BookResponse{
-		Id:       book.ID,
-		Title:    book.Title,
-		AuthorId: book.AuthorID,
-		Year:     book.Year,
+		Id:          book.ID(),
+		Title:       book.Title(),
+		AuthorId:    book.AuthorID(),
+		Year:        book.Year(),
+		Description: description,
 	}
 }
 
 func toGeneratedAuthorResponse(author domain.Author) generated.AuthorResponse {
 	return generated.AuthorResponse{
-		Id:   author.ID,
-		Name: author.Name,
+		Id:   author.ID(),
+		Name: author.Name(),
 	}
 }

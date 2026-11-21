@@ -22,6 +22,9 @@ paths:
         - Books
       summary: Получить список книг
       operationId: getBooks
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
       responses:
         '200':
           description: Список книг получен
@@ -34,8 +37,12 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/BookResponse'
+                  total:
+                    type: integer
+                    minimum: 0
                 required:
                   - data
+                  - total
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -164,6 +171,9 @@ paths:
         - Authors
       summary: Получить список авторов
       operationId: getAuthors
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
       responses:
         '200':
           description: Список авторов получен
@@ -176,8 +186,12 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/AuthorResponse'
+                  total:
+                    type: integer
+                    minimum: 0
                 required:
                   - data
+                  - total
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -283,6 +297,25 @@ components:
         type: integer
         minimum: 1
 
+    Page:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 10
+
   schemas:
     BookResponse:
       type: object
@@ -295,11 +328,18 @@ components:
           type: integer
         author_id:
           type: integer
+        description:
+          type: string
+          nullable: true
+        categories:
+          type: array
       required:
         - id
         - title
         - year
         - author_id
+        - description
+        - categories
 
     AuthorResponse:
       type: object
@@ -317,39 +357,59 @@ components:
       properties:
         title:
           type: string
-        author_id:
-          type: integer
-          minimum: 1
+          minLength: 1
         year:
           type: integer
           minimum: 1
+        author_id:
+          type: integer
+          minimum: 1
+        description:
+          type: string
+          minLength: 1
+          nullable: true
+        category_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+          uniqueItems: true
       required:
         - title
-        - author_id
         - year
+        - author_id
 
     UpdateBookRequest:
       type: object
       properties:
         title:
           type: string
-        author_id:
-          type: integer
-          minimum: 1
+          minLength: 1
         year:
           type: integer
           minimum: 1
+        author_id:
+          type: integer
+          minimum: 1
+        description:
+          type: string
+          nullable: true
 
     CreateBookWithAuthorRequest:
       type: object
       properties:
         title:
           type: string
+          minLength: 1
         year:
           type: integer
           minimum: 1
         author_name:
           type: string
+          minLength: 1
+        description:
+          type: string
+          nullable: true
       required:
         - title
         - year
@@ -360,6 +420,7 @@ components:
       properties:
         name:
           type: string
+          minLength: 1
       required:
         - name
 
@@ -368,6 +429,7 @@ components:
       properties:
         name:
           type: string
+          minLength: 1
 
     BookMutationResponse:
       type: object

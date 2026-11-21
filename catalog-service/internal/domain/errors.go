@@ -4,10 +4,12 @@ import "errors"
 
 // books
 var (
-	ErrBookNotFound    = errors.New("book not found")
-	ErrInvalidBookID   = errors.New("invalid book id")
-	ErrInvalidBookData = errors.New("invalid book data")
-	ErrEmptyBookPatch  = errors.New("empty book patch")
+	ErrBookNotFound           = errors.New("book not found")
+	ErrInvalidBookID          = errors.New("invalid book id")
+	ErrInvalidBookData        = errors.New("invalid book data")
+	ErrEmptyBookPatch         = errors.New("empty book patch")
+	ErrMapBookToDomain        = errors.New("failed to map book to domain")
+	ErrInvalidBookDescription = errors.New("empty book description")
 )
 
 // authors
@@ -23,5 +25,7 @@ var (
 
 // other
 var (
-	ErrInternalServer = errors.New("internal server error")
+	ErrValidationError   = errors.New("validation error")
+	ErrInternalServer    = errors.New("internal server error")
+	ErrInvalidPagination = errors.New("invalid pagination parameters")
 )

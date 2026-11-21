@@ -26,7 +26,7 @@ func NewService(
 }
 
 func (s *BookService) Create(ctx context.Context, book domain.Book) (domain.Book, error) {
-	_, err := s.repoAuthor.GetByID(ctx, book.AuthorID)
+	_, err := s.repoAuthor.GetByID(ctx, book.AuthorID())
 	if errors.Is(err, domain.ErrAuthorNotFound) {
 		return domain.Book{}, domain.ErrAuthorNotFound
 	}
@@ -41,8 +41,8 @@ func (s *BookService) GetByID(ctx context.Context, id int) (*domain.Book, error)
 	return s.repoBook.GetByID(ctx, id)
 }
 
-func (s *BookService) GetAll(ctx context.Context) ([]domain.Book, error) {
-	return s.repoBook.GetAll(ctx)
+func (s *BookService) GetAll(ctx context.Context, page, limit int) ([]domain.Book, int, error) {
+	return s.repoBook.GetAll(ctx, page, limit)
 }
 
 func (s *BookService) Delete(ctx context.Context, id int) error {
@@ -50,23 +50,43 @@ func (s *BookService) Delete(ctx context.Context, id int) error {
 }
 
 func (s *BookService) Update(ctx context.Context, id int, patch domain.BookPatch) (domain.Book, error) {
-	if patch.Title == nil && patch.AuthorID == nil && patch.Year == nil {
+	if patch.IsEmpty() {
 		return domain.Book{}, domain.ErrEmptyBookPatch
 	}
 
-	if patch.AuthorID != nil {
-		_, err := s.repoAuthor.GetByID(ctx, *patch.AuthorID)
-		if errors.Is(err, domain.ErrAuthorNotFound) {
-			return domain.Book{}, domain.ErrAuthorNotFound
-		}
+	var updatedBook domain.Book
+	err := s.tx.Do(ctx, func(ctx context.Context) error {
+		_, err := s.GetByID(ctx, id)
 		if err != nil {
-			return domain.Book{}, fmt.Errorf("check author: %w", err)
+			return err
 		}
+
+		if patch.AuthorID != nil {
+			_, err = s.repoAuthor.GetByID(ctx, *patch.AuthorID)
+			if err != nil {
+				return err
+			}
+		}
+
+		if err = patch.Validate(); err != nil {
+			return err
+		}
+
+		updatedBook, err = s.repoBook.Update(ctx, id, patch)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	if err != nil {
+		return updatedBook, err
 	}
-	return s.repoBook.Update(ctx, id, patch)
+
+	return updatedBook, nil
 }
 
-func (s *BookService) CreateBookWithNewAuthor(ctx context.Context, book domain.Book, author domain.Author) (domain.Book, error) {
+func (s *BookService) CreateBookWithNewAuthor(ctx context.Context, book domain.CreateBookWithAuthor, author domain.Author) (domain.Book, error) {
 	var createdBook domain.Book
 	err := s.tx.Do(ctx, func(ctx context.Context) error {
 		createdAuthor, err := s.repoAuthor.GetOrCreate(ctx, author)
@@ -74,9 +94,19 @@ func (s *BookService) CreateBookWithNewAuthor(ctx context.Context, book domain.B
 			return fmt.Errorf("create author: %w", err)
 		}
 
-		book.AuthorID = createdAuthor.ID
-		createdBook, err = s.repoBook.Create(ctx, book)
+		newBook, err := domain.NewBook(
+			book.Title,
+			book.Year,
+			createdAuthor.ID(),
+			book.Description,
+		)
 		if err != nil {
+			return fmt.Errorf("create book entity: %w", err)
+		}
+
+		createdBook, err = s.repoBook.Create(ctx, newBook)
+		if err != nil {
+
 			return fmt.Errorf("create book: %w", err)
 		}
 		return nil
