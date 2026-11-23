@@ -7,12 +7,6 @@ type CreateBookCommand struct {
 	Description *string
 }
 
-type CreateBookWithAuthorCommand struct {
-	Title       string
-	Year        int
-	Description *string
-}
-
 type UpdateBookCommand struct {
 	ID          int
 	Title       *string

@@ -1,10 +1,12 @@
-package repository
+package postgres
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"virtual-library/catalog-service/internal/domain"
+	"virtual-library/catalog-service/internal/domain/entities"
+	"virtual-library/catalog-service/internal/domain/repositories"
+	"virtual-library/catalog-service/internal/httpapi/pagination"
 
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
@@ -17,7 +19,7 @@ type BookRepository struct {
 	pool *pgxpool.Pool
 }
 
-var _ domain.BookRepository = (*BookRepository)(nil)
+var _ repositories.BookRepository = (*BookRepository)(nil)
 
 func NewBookRepository(pool *pgxpool.Pool) *BookRepository {
 	if pool == nil {
@@ -34,7 +36,7 @@ type Book struct {
 	Description pgtype.Text
 }
 
-func (b *BookRepository) Create(ctx context.Context, book domain.Book) (domain.Book, error) {
+func (b *BookRepository) Create(ctx context.Context, book *entities.Book) (*entities.Book, error) {
 	db := txFromContext(ctx, b.pool)
 	query := `
 		INSERT INTO books(title, year, author_id, description) 
@@ -43,23 +45,22 @@ func (b *BookRepository) Create(ctx context.Context, book domain.Book) (domain.B
 	`
 	row, err := db.Query(ctx, query, book.Title(), book.Year(), book.AuthorID(), book.Description())
 	if err != nil {
-		return domain.Book{}, fmt.Errorf("create book: %w", err)
+		return nil, fmt.Errorf("create book: %w", err)
 	}
 
 	bookRow, err := pgx.CollectOneRow(row, pgx.RowToStructByName[Book])
 	if err != nil {
-		return domain.Book{}, mapPostgresError(err)
+		return nil, mapPostgresError(err)
 	}
 
-	newBook, err := toDomainBook(bookRow)
-	if err != nil {
-		return domain.Book{}, domain.ErrMapBookToDomain
-	}
+	newBook := toDomainBook(&bookRow)
+
 	return newBook, nil
 }
 
-func (b *BookRepository) GetByID(ctx context.Context, bookID int) (*domain.Book, error) {
+func (b *BookRepository) GetByID(ctx context.Context, bookID int) (*entities.Book, error) {
 	db := txFromContext(ctx, b.pool)
+
 	query := `SELECT id, title, year, author_id, description FROM books WHERE id = $1`
 	row, err := db.Query(ctx, query, bookID)
 	if err != nil {
@@ -69,22 +70,18 @@ func (b *BookRepository) GetByID(ctx context.Context, bookID int) (*domain.Book,
 	bookRow, err := pgx.CollectOneRow(row, pgx.RowToStructByName[Book])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrBookNotFound
+			return nil, entities.ErrBookNotFound
 		}
 		return nil, fmt.Errorf("scan book: %w", err)
 	}
 
-	newBook, err := toDomainBook(bookRow)
-	if err != nil {
-		return nil, domain.ErrMapBookToDomain
-	}
+	newBook := toDomainBook(&bookRow)
 
-	return &newBook, nil
+	return newBook, nil
 }
 
-func (b *BookRepository) GetAll(ctx context.Context, page int, limit int) ([]domain.Book, int, error) {
+func (b *BookRepository) GetAll(ctx context.Context, pagination *pagination.Pagination) ([]*entities.Book, int, error) {
 	db := txFromContext(ctx, b.pool)
-	offset := (page - 1) * limit
 	query := `
 		SELECT id, title, year, author_id, description
 		FROM books 
@@ -93,7 +90,7 @@ func (b *BookRepository) GetAll(ctx context.Context, page int, limit int) ([]dom
 		OFFSET $2
 `
 
-	rows, err := db.Query(ctx, query, limit, offset)
+	rows, err := db.Query(ctx, query, pagination.Limit(), pagination.Offset())
 	if err != nil {
 		return nil, 0, fmt.Errorf("get all books: %w", err)
 	}
@@ -102,15 +99,13 @@ func (b *BookRepository) GetAll(ctx context.Context, page int, limit int) ([]dom
 	if err != nil {
 		return nil, 0, fmt.Errorf("scan books: %w", err)
 	}
-	books, err := toDomainBooks(bookRows)
-	if err != nil {
-		return nil, 0, domain.ErrMapBookToDomain
-	}
+
+	books := toDomainBooks(bookRows)
 
 	var total int
 	err = db.QueryRow(ctx, "SELECT COUNT(*) FROM books").Scan(&total)
 	if err != nil {
-		return []domain.Book{}, 0, fmt.Errorf("count authors: %w", err)
+		return nil, 0, fmt.Errorf("count authors: %w", err)
 	}
 
 	return books, total, nil
@@ -124,13 +119,13 @@ func (b *BookRepository) Delete(ctx context.Context, bookID int) error {
 		return fmt.Errorf("delete book: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return domain.ErrBookNotFound
+		return entities.ErrBookNotFound
 	}
 
 	return nil
 }
 
-func (b *BookRepository) Update(ctx context.Context, id int, patch domain.BookPatch) (domain.Book, error) {
+func (b *BookRepository) Update(ctx context.Context, book *entities.Book) (*entities.Book, error) {
 	db := txFromContext(ctx, b.pool)
 	query := `
 		UPDATE books
@@ -141,27 +136,21 @@ func (b *BookRepository) Update(ctx context.Context, id int, patch domain.BookPa
 		WHERE id = $5
 		RETURNING id, title, author_id, year, description
 	`
-	row, err := db.Query(ctx, query, patch.Title, patch.Year, patch.AuthorID, patch.Description, id)
+	row, err := db.Query(ctx, query, book.Title(), book.Year(), book.AuthorID(), book.Description(), book.ID())
 	if err != nil {
-		return domain.Book{}, fmt.Errorf("update book: %w", err)
+		return nil, fmt.Errorf("update book: %w", err)
 	}
 
 	bookRow, err := pgx.CollectOneRow(row, pgx.RowToStructByName[Book])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return domain.Book{}, domain.ErrBookNotFound
+			return nil, entities.ErrBookNotFound
 		}
 
-		return domain.Book{}, fmt.Errorf(
-			"update book: %w",
-			mapPostgresError(err),
-		)
+		return nil, fmt.Errorf("update book: %w", mapPostgresError(err))
 	}
 
-	newBook, err := toDomainBook(bookRow)
-	if err != nil {
-		return domain.Book{}, domain.ErrMapBookToDomain
-	}
+	newBook := toDomainBook(&bookRow)
 
 	return newBook, nil
 }
@@ -178,37 +167,34 @@ func mapPostgresError(err error) error {
 
 	switch pgErr.ConstraintName {
 	case "fk_books_authors":
-		return domain.ErrAuthorNotFound
+		return entities.ErrAuthorNotFound
 	}
 	// add fk_books_categories case
 
 	return err
 }
 
-func toDomainBooks(bookRows []Book) ([]domain.Book, error) {
-	books := make([]domain.Book, 0, len(bookRows))
+func toDomainBooks(bookRows []Book) []*entities.Book {
+	books := make([]*entities.Book, 0, len(bookRows))
 	for _, row := range bookRows {
-		book, err := toDomainBook(row)
-		if err != nil {
-			return nil, domain.ErrMapBookToDomain
-		}
+		book := toDomainBook(&row)
 		books = append(books, book)
 	}
-	return books, nil
+	return books
 }
 
-func toDomainBook(b Book) (domain.Book, error) {
+func toDomainBook(b *Book) *entities.Book {
 	var description *string
 
 	if b.Description.Valid {
 		description = &b.Description.String
 	}
 
-	return domain.HydrateBook(
+	return entities.HydrateBook(
 		b.ID,
 		b.Title,
 		b.Year,
 		b.AuthorID,
 		description,
-	), nil
+	)
 }

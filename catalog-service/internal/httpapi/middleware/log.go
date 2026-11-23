@@ -1,4 +1,4 @@
-package httpapi
+package middleware
 
 import (
 	"log/slog"
@@ -6,9 +6,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func requestLogAttrs(c *gin.Context) []slog.Attr {
+func RequestLogAttrs(c *gin.Context, err error) []slog.Attr {
 	return []slog.Attr{
 		slog.String("method", c.Request.Method),
 		slog.String("path", c.Request.URL.Path),
+		slog.String("error", err.Error()),
 	}
 }

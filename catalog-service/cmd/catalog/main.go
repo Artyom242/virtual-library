@@ -6,11 +6,10 @@ import (
 	"log/slog"
 	"os"
 	"time"
+	"virtual-library/catalog-service/internal/app/services"
 	"virtual-library/catalog-service/internal/httpapi"
 	"virtual-library/catalog-service/internal/infra/config"
 	pgrs "virtual-library/catalog-service/internal/infra/db/postgres"
-	"virtual-library/catalog-service/internal/repository"
-	"virtual-library/catalog-service/internal/service"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/joho/godotenv"
@@ -34,13 +33,13 @@ func main() {
 	}
 	defer pool.Close()
 
-	tx := repository.NewPgxTransactor(pool)
+	tx := pgrs.NewPgxTransactor(pool)
 	// Author process
-	authorRepo := repository.NewAuthorRepository(pool)
-	authorService := service.NewAuthorService(tx, authorRepo)
+	authorRepo := pgrs.NewAuthorRepository(pool)
+	authorService := services.NewAuthorService(tx, authorRepo)
 	// Book process
-	bookRepo := repository.NewBookRepository(pool)
-	bookService := service.NewService(tx, bookRepo, authorRepo)
+	bookRepo := pgrs.NewBookRepository(pool)
+	bookService := services.NewService(tx, bookRepo, authorRepo)
 	router := httpapi.NewRouter(bookService, authorService)
 
 	err = router.Run(":8080")
