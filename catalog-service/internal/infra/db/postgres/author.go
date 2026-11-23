@@ -1,16 +1,20 @@
-package repository
+package postgres
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"virtual-library/catalog-service/internal/domain"
+	"virtual-library/catalog-service/internal/app"
+	"virtual-library/catalog-service/internal/domain/entities"
+	"virtual-library/catalog-service/internal/domain/repositories"
+	"virtual-library/catalog-service/internal/httpapi/pagination"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// PostgreSQL unique_violation code
 const pgUniqueViolation = "23505"
 
 type AuthorRepository struct {
@@ -29,68 +33,56 @@ func NewAuthorRepository(pool *pgxpool.Pool) *AuthorRepository {
 	return &AuthorRepository{pool: pool}
 }
 
-var _ domain.AuthorRepository = (*AuthorRepository)(nil)
+var _ repositories.AuthorRepository = (*AuthorRepository)(nil)
 
-func (a *AuthorRepository) Create(c context.Context, author domain.Author) (domain.Author, error) {
+func (a *AuthorRepository) Create(c context.Context, author *entities.Author) (*entities.Author, error) {
 	db := txFromContext(c, a.pool)
 
 	query := "INSERT INTO authors(name) VALUES($1) returning id, name"
 	rows, err := db.Query(c, query, author.Name())
 	if err != nil {
-		return domain.Author{}, err
+		return nil, err
 	}
 
-	authorRow, err := pgx.CollectOneRow(
-		rows,
-		pgx.RowToStructByName[Author],
-	)
-
+	authorRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[Author])
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
-			return domain.Author{}, domain.ErrAuthorAlreadyExists
+			return nil, app.ErrAuthorAlreadyExists
 		}
 
-		return domain.Author{}, fmt.Errorf("create author: %w", err)
+		return nil, fmt.Errorf("create author: %w", err)
 	}
 
-	newAuthor, err := toDomainAuthor(authorRow)
-	if err != nil {
-		return domain.Author{}, domain.ErrMapAuthorToDomain
-	}
+	newAuthor := toDomainAuthor(&authorRow)
+
 	return newAuthor, nil
 }
 
-func (a *AuthorRepository) GetByID(c context.Context, authorID int) (*domain.Author, error) {
+func (a *AuthorRepository) GetByID(c context.Context, authorID int) (*entities.Author, error) {
 	db := txFromContext(c, a.pool)
+
 	query := "SELECT authors.id, authors.name FROM authors WHERE id = $1"
 	row, err := db.Query(c, query, authorID)
 	if err != nil {
 		return nil, fmt.Errorf("get author by id: %w", err)
 	}
 
-	authorRow, err := pgx.CollectOneRow(
-		row,
-		pgx.RowToStructByName[Author],
-	)
+	authorRow, err := pgx.CollectOneRow(row, pgx.RowToStructByName[Author])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrAuthorNotFound
+			return nil, entities.ErrAuthorNotFound
 		}
 		return nil, fmt.Errorf("scan author: %w", err)
 	}
 
-	author, err := toDomainAuthor(authorRow)
-	if err != nil {
-		return nil, fmt.Errorf("map author to domain: %w", err)
-	}
+	author := toDomainAuthor(&authorRow)
 
-	return &author, nil
+	return author, nil
 }
 
-func (a *AuthorRepository) GetAll(c context.Context, page int, limit int) ([]domain.Author, int, error) {
+func (a *AuthorRepository) GetAll(c context.Context, pagination *pagination.Pagination) ([]*entities.Author, int, error) {
 	db := txFromContext(c, a.pool)
-	offset := (page - 1) * limit
 
 	query := `
 		SELECT authors.id, authors.name 
@@ -99,31 +91,28 @@ func (a *AuthorRepository) GetAll(c context.Context, page int, limit int) ([]dom
 		LIMIT $1
 		OFFSET $2
 		`
-	rows, err := db.Query(c, query, limit, offset)
+	rows, err := db.Query(c, query, pagination.Limit(), pagination.Offset())
 	if err != nil {
-		return []domain.Author{}, 0, fmt.Errorf("get all authors: %w", err)
+		return nil, 0, fmt.Errorf("get all authors: %w", err)
 	}
 
 	authorRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[Author])
 	if err != nil {
-		return []domain.Author{}, 0, fmt.Errorf("scan author: %w", err)
+		return nil, 0, fmt.Errorf("scan author: %w", err)
 	}
 
-	authors, err := toDomainAuthors(authorRows)
-	if err != nil {
-		return []domain.Author{}, 0, fmt.Errorf("map author to domain: %w", err)
-	}
+	authors := toDomainAuthors(authorRows)
 
 	var total int
 	err = db.QueryRow(c, "SELECT COUNT(*) FROM authors").Scan(&total)
 	if err != nil {
-		return []domain.Author{}, 0, fmt.Errorf("count authors: %w", err)
+		return nil, 0, fmt.Errorf("count authors: %w", err)
 	}
 
 	return authors, total, nil
 }
 
-func (a *AuthorRepository) GetOrCreate(ctx context.Context, author domain.Author) (domain.Author, error) {
+func (a *AuthorRepository) GetOrCreate(ctx context.Context, author *entities.Author) (*entities.Author, error) {
 	db := txFromContext(ctx, a.pool)
 
 	query := `
@@ -136,43 +125,43 @@ func (a *AuthorRepository) GetOrCreate(ctx context.Context, author domain.Author
 
 	row, err := db.Query(ctx, query, author.Name())
 	if err != nil {
-		return domain.Author{}, fmt.Errorf("create author: %w", err)
+		return nil, fmt.Errorf("create author: %w", err)
 	}
 
 	authorRow, err := pgx.CollectOneRow(row, pgx.RowToStructByName[Author])
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
-			return domain.Author{}, fmt.Errorf("scan author: %w", err)
+			return nil, fmt.Errorf("scan author: %w", err)
 		}
 
 		query = `SELECT id, name FROM authors WHERE name = $1`
 		row, err = db.Query(ctx, query, author.Name())
 		if err != nil {
-			return domain.Author{}, fmt.Errorf("get author: %w", err)
+			return nil, fmt.Errorf("get author: %w", err)
 		}
 		defer row.Close()
 
 		authorRow, err = pgx.CollectOneRow(row, pgx.RowToStructByName[Author])
 		if err != nil {
-			return domain.Author{}, fmt.Errorf("scan author: %w", err)
+			return nil, fmt.Errorf("scan author: %w", err)
 		}
 	}
 
-	author, err = toDomainAuthor(authorRow)
-	if err != nil {
-		return domain.Author{}, fmt.Errorf("map author to domain: %w", err)
-	}
-	return author, nil
+	newAuthor := toDomainAuthor(&authorRow)
+
+	return newAuthor, nil
 }
 
 func (a *AuthorRepository) HasBooks(c context.Context, authorID int) (bool, error) {
 	db := txFromContext(c, a.pool)
 	query := "SELECT EXISTS(SELECT 1 FROM books WHERE author_id = $1)"
+
 	var hasBooks bool
 	err := db.QueryRow(c, query, authorID).Scan(&hasBooks)
 	if err != nil {
 		return false, fmt.Errorf("check author books: %w", err)
 	}
+
 	return hasBooks, nil
 }
 
@@ -184,58 +173,55 @@ func (a *AuthorRepository) Delete(c context.Context, authorID int) error {
 		return fmt.Errorf("delete author: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return domain.ErrAuthorNotFound
+		return entities.ErrAuthorNotFound
 	}
 
 	return nil
 }
 
-func (a *AuthorRepository) Update(c context.Context, id int, patch domain.AuthorPatch) (domain.Author, error) {
+func (a *AuthorRepository) Update(c context.Context, author *entities.Author) (*entities.Author, error) {
 	db := txFromContext(c, a.pool)
 
 	query := `UPDATE authors 
 		SET name = COALESCE($1, name) 
 		WHERE id = $2 
 		RETURNING id, name`
-	row, err := db.Query(c, query, patch.Name, id)
+	row, err := db.Query(c, query, author.Name(), author.ID())
 	if err != nil {
-		return domain.Author{}, fmt.Errorf("update author: %w", err)
+		return nil, fmt.Errorf("update author: %w", err)
 	}
 
 	authorRow, err := pgx.CollectOneRow(row, pgx.RowToStructByName[Author])
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
-			return domain.Author{}, domain.ErrAuthorAlreadyExists
+			return nil, app.ErrAuthorAlreadyExists
 		}
 		if errors.Is(err, pgx.ErrNoRows) {
-			return domain.Author{}, domain.ErrAuthorNotFound
+			return nil, entities.ErrAuthorNotFound
 		}
-		return domain.Author{}, fmt.Errorf("update author: %w", err)
+		return nil, fmt.Errorf("update author: %w", err)
 	}
 
-	author, err := toDomainAuthor(authorRow)
-	if err != nil {
-		return domain.Author{}, fmt.Errorf("map author to domain: %w", err)
-	}
+	newAuthor := toDomainAuthor(&authorRow)
 
-	return author, nil
+	return newAuthor, nil
 }
 
-func toDomainAuthors(authorRows []Author) ([]domain.Author, error) {
-	authors := make([]domain.Author, 0, len(authorRows))
+func toDomainAuthors(authorRows []Author) []*entities.Author {
+	authors := make([]*entities.Author, 0, len(authorRows))
 
 	for _, row := range authorRows {
-		author, err := toDomainAuthor(row)
-		if err != nil {
-			return nil, fmt.Errorf("map author: %w", err)
-		}
+		author := toDomainAuthor(&row)
 		authors = append(authors, author)
 	}
 
-	return authors, nil
+	return authors
 }
 
-func toDomainAuthor(a Author) (domain.Author, error) {
-	return domain.HydrateAuthor(a.ID, a.Name), nil
+func toDomainAuthor(a *Author) *entities.Author {
+	return entities.HydrateAuthor(
+		a.ID,
+		a.Name,
+	)
 }
