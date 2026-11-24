@@ -14,9 +14,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// PostgreSQL unique_violation code
-const pgUniqueViolation = "23505"
-
 type AuthorRepository struct {
 	pool *pgxpool.Pool
 }

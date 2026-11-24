@@ -53,7 +53,7 @@ func (a *Author) ApplyAuthor(author AuthorChanges) (*Author, error) {
 	}
 
 	if err := updated.validate(); err != nil {
-		return &Author{}, err
+		return nil, err
 	}
 
 	return &updated, nil

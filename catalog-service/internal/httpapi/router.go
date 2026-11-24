@@ -8,9 +8,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewRouter(bookService interfaces.BookService, authorService interfaces.AuthorService) *gin.Engine {
+func NewRouter(
+	bookService interfaces.BookService,
+	authorService interfaces.AuthorService,
+	categoryService interfaces.CategoryService,
+) *gin.Engine {
 	router := gin.Default()
-	mainHandler := handler.NewCombinedHandler(bookService, authorService)
+	mainHandler := handler.NewCombinedHandler(bookService, authorService, categoryService)
 	generated.RegisterHandlers(router, mainHandler)
 
 	return router

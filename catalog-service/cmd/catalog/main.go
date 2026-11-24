@@ -40,7 +40,10 @@ func main() {
 	// Book process
 	bookRepo := pgrs.NewBookRepository(pool)
 	bookService := services.NewService(tx, bookRepo, authorRepo)
-	router := httpapi.NewRouter(bookService, authorService)
+	// Category process
+	categoryRepo := pgrs.NewCategoryRepository(pool)
+	categoryService := services.NewCategoryService(tx, categoryRepo)
+	router := httpapi.NewRouter(bookService, authorService, categoryService)
 
 	err = router.Run(":8080")
 	if err != nil {

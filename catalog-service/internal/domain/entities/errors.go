@@ -17,4 +17,11 @@ var (
 	ErrInvalidAuthorData = errors.New("invalid author data")
 )
 
+// categories
+var (
+	ErrCategoryNotFound      = errors.New("category not found")
+	ErrInvalidCategoryID     = errors.New("invalid category id")
+	ErrCategoryAlreadyExists = errors.New("category already exists")
+)
+
 var ErrValidationError = errors.New("validation error")

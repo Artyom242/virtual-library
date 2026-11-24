@@ -8,13 +8,19 @@ import (
 type CombinedHandler struct {
 	*BookHandler
 	*AuthorHandler
+	*CategoryHandler
 }
 
 var _ generated.ServerInterface = (*CombinedHandler)(nil)
 
-func NewCombinedHandler(bookService interfaces.BookService, authorService interfaces.AuthorService) *CombinedHandler {
+func NewCombinedHandler(
+	bookService interfaces.BookService,
+	authorService interfaces.AuthorService,
+	categoryService interfaces.CategoryService,
+) *CombinedHandler {
 	return &CombinedHandler{
-		BookHandler:   NewBookHandler(bookService),
-		AuthorHandler: NewAuthorHandler(authorService),
+		BookHandler:     NewBookHandler(bookService),
+		AuthorHandler:   NewAuthorHandler(authorService),
+		CategoryHandler: NewCategoryHandler(categoryService),
 	}
 }

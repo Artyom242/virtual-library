@@ -76,7 +76,7 @@ func (h *BookHandler) CreateBook(c *gin.Context) {
 		errorHandler.HandleCatalogError(ctx, c, err, slog.String("title", request.Title))
 		return
 	}
-	if request.AuthorId < 1 {
+	if validation.ValidID(request.AuthorId) {
 		errorHandler.HandleCatalogError(ctx, c, entities.ErrInvalidAuthorID, slog.Int("author_id", request.AuthorId))
 		return
 	}

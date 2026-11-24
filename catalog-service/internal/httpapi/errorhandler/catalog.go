@@ -44,30 +44,42 @@ func HandleCatalogError(
 		level = slog.LevelWarn
 		message = entities.ErrValidationError.Error()
 
+	// Book errors
 	case errors.Is(err, entities.ErrBookNotFound):
 		status = http.StatusNotFound
 		level = slog.LevelWarn
 		message = entities.ErrBookNotFound.Error()
 
-	case errors.Is(err, entities.ErrAuthorNotFound):
-		status = http.StatusConflict
-		level = slog.LevelWarn
-		message = entities.ErrAuthorNotFound.Error()
-
-	case errors.Is(err, app.ErrAuthorAlreadyExists):
-		status = http.StatusConflict
-		level = slog.LevelWarn
-		message = app.ErrAuthorAlreadyExists.Error()
-
-	case errors.Is(err, entities.ErrInvalidAuthorID):
+	case errors.Is(err, entities.ErrInvalidBookData):
 		status = http.StatusBadRequest
 		level = slog.LevelWarn
-		message = entities.ErrInvalidAuthorID.Error()
+		message = entities.ErrInvalidBookData.Error()
+
+	case errors.Is(err, entities.ErrInvalidBookDescription):
+		status = http.StatusBadRequest
+		level = slog.LevelWarn
+		message = entities.ErrInvalidBookDescription.Error()
+
+	case errors.Is(err, app.ErrEmptyBookPatch):
+		status = http.StatusBadRequest
+		level = slog.LevelWarn
+		message = app.ErrEmptyBookPatch.Error()
+
+	// Author errors
+	case errors.Is(err, entities.ErrAuthorNotFound):
+		status = http.StatusNotFound
+		level = slog.LevelWarn
+		message = entities.ErrAuthorNotFound.Error()
 
 	case errors.Is(err, entities.ErrInvalidAuthorData):
 		status = http.StatusBadRequest
 		level = slog.LevelWarn
 		message = entities.ErrInvalidAuthorData.Error()
+
+	case errors.Is(err, app.ErrAuthorAlreadyExists):
+		status = http.StatusConflict
+		level = slog.LevelWarn
+		message = app.ErrAuthorAlreadyExists.Error()
 
 	case errors.Is(err, app.ErrEmptyAuthorPatch):
 		status = http.StatusBadRequest
@@ -79,25 +91,16 @@ func HandleCatalogError(
 		level = slog.LevelWarn
 		message = app.ErrAuthorHasBooks.Error()
 
-	case errors.Is(err, entities.ErrInvalidBookID):
-		status = http.StatusBadRequest
+	// Category errors
+	case errors.Is(err, entities.ErrCategoryNotFound):
+		status = http.StatusNotFound
 		level = slog.LevelWarn
-		message = entities.ErrInvalidBookID.Error()
+		message = entities.ErrCategoryNotFound.Error()
 
-	case errors.Is(err, entities.ErrInvalidBookData):
-		status = http.StatusBadRequest
+	case errors.Is(err, entities.ErrCategoryAlreadyExists):
+		status = http.StatusConflict
 		level = slog.LevelWarn
-		message = entities.ErrInvalidBookData.Error()
-
-	case errors.Is(err, app.ErrEmptyBookPatch):
-		status = http.StatusBadRequest
-		level = slog.LevelWarn
-		message = app.ErrEmptyBookPatch.Error()
-
-	case errors.Is(err, entities.ErrInvalidBookDescription):
-		status = http.StatusBadRequest
-		level = slog.LevelWarn
-		message = entities.ErrInvalidBookDescription.Error()
+		message = entities.ErrCategoryAlreadyExists.Error()
 
 	default:
 		status = http.StatusInternalServerError

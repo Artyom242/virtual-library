@@ -14,6 +14,8 @@ tags:
     description: Управление книгами
   - name: Authors
     description: Управление авторами
+  - name: Categories
+    description: Управление категориями
 
 paths:
   /books:
@@ -286,6 +288,127 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /categories:
+    get:
+      tags:
+        - Categories
+      summary: Получить список категорий
+      operationId: getCategories
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Список категорий получен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CategoryResponse'
+                  total:
+                    type: integer
+                    minimum: 0
+                required:
+                  - data
+                  - total
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - Categories
+      summary: Создать категорию
+      operationId: createCategory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCategoryRequest'
+      responses:
+        '201':
+          description: Категория создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryMutationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /categories/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ID'
+
+    get:
+      tags:
+        - Categories
+      summary: Получить категорию по ID
+      operationId: getCategoryById
+      responses:
+        '200':
+          description: Категория найдена
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/CategoryResponse'
+                required:
+                  - data
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    patch:
+      tags:
+        - Categories
+      summary: Частично обновить категорию
+      operationId: updateCategory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCategoryRequest'
+      responses:
+        '200':
+          description: Категория обновлена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryMutationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - Categories
+      summary: Удалить категорию
+      operationId: deleteCategory
+      responses:
+        '204':
+          description: Категория удалена
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
 components:
   parameters:
     ID:
@@ -430,6 +553,41 @@ components:
         name:
           type: string
           minLength: 1
+
+    CreateCategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+      required:
+        - name
+
+    UpdateCategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+
+    CategoryResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+        - id
+        - name
+
+    CategoryMutationResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/CategoryResponse'
+      required:
+        - data
 
     BookMutationResponse:
       type: object

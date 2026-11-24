@@ -32,3 +32,10 @@ func ToGeneratedAuthorResponse(author *entities.Author) generated.AuthorResponse
 		Name: author.Name(),
 	}
 }
+
+func ToGeneratedCategoryResponse(category *entities.Category) generated.CategoryResponse {
+	return generated.CategoryResponse{
+		Id:   category.ID(),
+		Name: category.Name(),
+	}
+}
