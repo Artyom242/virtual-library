@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"time"
-	"virtual-library/catalog-service/internal/app/services"
+	"virtual-library/catalog-service/internal/app/service"
 	"virtual-library/catalog-service/internal/httpapi"
 	"virtual-library/catalog-service/internal/infra/config"
 	pgrs "virtual-library/catalog-service/internal/infra/db/postgres"
@@ -36,13 +36,13 @@ func main() {
 	tx := pgrs.NewPgxTransactor(pool)
 	// Author process
 	authorRepo := pgrs.NewAuthorRepository(pool)
-	authorService := services.NewAuthorService(tx, authorRepo)
+	authorService := service.NewAuthorService(tx, authorRepo)
 	// Book process
 	bookRepo := pgrs.NewBookRepository(pool)
-	bookService := services.NewService(tx, bookRepo, authorRepo)
+	bookService := service.NewService(tx, bookRepo, authorRepo)
 	// Category process
 	categoryRepo := pgrs.NewCategoryRepository(pool)
-	categoryService := services.NewCategoryService(tx, categoryRepo)
+	categoryService := service.NewCategoryService(tx, categoryRepo)
 	router := httpapi.NewRouter(bookService, authorService, categoryService)
 
 	err = router.Run(":8080")

@@ -1,7 +1,7 @@
 package httpapi
 
 import (
-	"virtual-library/catalog-service/internal/app/interfaces"
+	"virtual-library/catalog-service/internal/app/interface"
 	"virtual-library/catalog-service/internal/httpapi/generated"
 	"virtual-library/catalog-service/internal/httpapi/handler"
 
@@ -9,9 +9,9 @@ import (
 )
 
 func NewRouter(
-	bookService interfaces.BookService,
-	authorService interfaces.AuthorService,
-	categoryService interfaces.CategoryService,
+	bookService _interface.BookService,
+	authorService _interface.AuthorService,
+	categoryService _interface.CategoryService,
 ) *gin.Engine {
 	router := gin.Default()
 	mainHandler := handler.NewCombinedHandler(bookService, authorService, categoryService)

@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 	"virtual-library/catalog-service/internal/app/command"
-	"virtual-library/catalog-service/internal/app/interfaces"
-	"virtual-library/catalog-service/internal/domain/entities"
+	"virtual-library/catalog-service/internal/app/interface"
+	"virtual-library/catalog-service/internal/domain/entity"
 	errorHandler "virtual-library/catalog-service/internal/httpapi/errorhandler"
 	"virtual-library/catalog-service/internal/httpapi/generated"
 	"virtual-library/catalog-service/internal/httpapi/mapper"
@@ -16,10 +16,10 @@ import (
 )
 
 type BookHandler struct {
-	service interfaces.BookService
+	service _interface.BookService
 }
 
-func NewBookHandler(service interfaces.BookService) *BookHandler {
+func NewBookHandler(service _interface.BookService) *BookHandler {
 	return &BookHandler{service: service}
 }
 
@@ -44,7 +44,7 @@ func (h *BookHandler) GetBookById(c *gin.Context, id generated.ID) {
 	ctx := c.Request.Context()
 	if !validation.IsIDMoreThanOne(id) {
 		c.JSON(http.StatusBadRequest, generated.ErrorResponse{
-			Message: entities.ErrInvalidBookID.Error(),
+			Message: entity.ErrInvalidBookID.Error(),
 		})
 		return
 	}
@@ -69,7 +69,7 @@ func (h *BookHandler) CreateBook(c *gin.Context) {
 		return
 	}
 	if !validation.IsIDMoreThanOne(request.AuthorId) {
-		errorHandler.HandleCatalogError(ctx, c, entities.ErrInvalidAuthorID,
+		errorHandler.HandleCatalogError(ctx, c, entity.ErrInvalidAuthorID,
 			slog.Int("author_id", request.AuthorId),
 		)
 		return
@@ -77,7 +77,7 @@ func (h *BookHandler) CreateBook(c *gin.Context) {
 
 	if request.CategoryIds != nil {
 		if !validation.IsUniqueValues(*request.CategoryIds) {
-			errorHandler.HandleCatalogError(ctx, c, entities.ErrCategoryNotUnique,
+			errorHandler.HandleCatalogError(ctx, c, entity.ErrCategoryNotUnique,
 				slog.Any("categories_ids", request.CategoryIds),
 			)
 			return
@@ -121,7 +121,7 @@ func (h *BookHandler) CreateBookWithAuthor(c *gin.Context) {
 
 	if *request.CategoryIds != nil {
 		if !validation.IsUniqueValues(*request.CategoryIds) {
-			errorHandler.HandleCatalogError(ctx, c, entities.ErrCategoryNotUnique,
+			errorHandler.HandleCatalogError(ctx, c, entity.ErrCategoryNotUnique,
 				slog.Any("categories_ids", *request.CategoryIds),
 			)
 			return
@@ -154,7 +154,7 @@ func (h *BookHandler) DeleteBook(c *gin.Context, id generated.ID) {
 	ctx := c.Request.Context()
 	if !validation.IsIDMoreThanOne(id) {
 		c.JSON(http.StatusBadRequest, generated.ErrorResponse{
-			Message: entities.ErrInvalidBookID.Error(),
+			Message: entity.ErrInvalidBookID.Error(),
 		})
 		return
 	}
@@ -172,7 +172,7 @@ func (h *BookHandler) UpdateBook(c *gin.Context, id generated.ID) {
 	ctx := c.Request.Context()
 	if !validation.IsIDMoreThanOne(id) {
 		c.JSON(http.StatusBadRequest, generated.ErrorResponse{
-			Message: entities.ErrInvalidBookID.Error(),
+			Message: entity.ErrInvalidBookID.Error(),
 		})
 		return
 	}

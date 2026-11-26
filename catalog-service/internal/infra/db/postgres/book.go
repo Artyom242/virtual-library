@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"virtual-library/catalog-service/internal/domain/entities"
-	"virtual-library/catalog-service/internal/domain/repositories"
+	"virtual-library/catalog-service/internal/domain/entity"
+	"virtual-library/catalog-service/internal/domain/repository"
 	"virtual-library/catalog-service/internal/httpapi/pagination"
+	IRepository "virtual-library/catalog-service/internal/infra/db/repository"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -17,7 +18,7 @@ type BookRepository struct {
 	pool *pgxpool.Pool
 }
 
-var _ repositories.BookRepository = (*BookRepository)(nil)
+var _ repository.BookRepository = (*BookRepository)(nil)
 
 func NewBookRepository(pool *pgxpool.Pool) *BookRepository {
 	if pool == nil {
@@ -39,7 +40,7 @@ type BookWithCategories struct {
 	CategoryIDs []int
 }
 
-func (b *BookRepository) Create(ctx context.Context, book *entities.Book) (*entities.Book, error) {
+func (b *BookRepository) Create(ctx context.Context, book IRepository.IBook) (*entity.Book, error) {
 	db := txFromContext(ctx, b.pool)
 	query := `
 		INSERT INTO books(title, year, author_id, description) 
@@ -73,7 +74,7 @@ func (b *BookRepository) Create(ctx context.Context, book *entities.Book) (*enti
 	return newBook, nil
 }
 
-func (b *BookRepository) GetByID(ctx context.Context, bookID int) (*entities.Book, error) {
+func (b *BookRepository) GetByID(ctx context.Context, bookID int) (*entity.Book, error) {
 	db := txFromContext(ctx, b.pool)
 
 	query := `SELECT id, title, year, author_id, description FROM books WHERE id = $1`
@@ -85,7 +86,7 @@ func (b *BookRepository) GetByID(ctx context.Context, bookID int) (*entities.Boo
 	bookRow, err := pgx.CollectOneRow(row, pgx.RowToStructByName[Book])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, entities.ErrBookNotFound
+			return nil, entity.ErrBookNotFound
 		}
 		return nil, fmt.Errorf("scan book: %w", err)
 	}
@@ -105,7 +106,7 @@ func (b *BookRepository) GetByID(ctx context.Context, bookID int) (*entities.Boo
 	return newBook, nil
 }
 
-func (b *BookRepository) GetAll(ctx context.Context, pagination *pagination.Pagination) ([]*entities.Book, int, error) {
+func (b *BookRepository) GetAll(ctx context.Context, pagination *pagination.Pagination) ([]*entity.Book, int, error) {
 	db := txFromContext(ctx, b.pool)
 	query := `
 		SELECT id, title, year, author_id, description
@@ -136,7 +137,7 @@ func (b *BookRepository) GetAll(ctx context.Context, pagination *pagination.Pagi
 		return nil, 0, err
 	}
 
-	books := make([]*entities.Book, 0, len(bookRows))
+	books := make([]*entity.Book, 0, len(bookRows))
 	for _, book := range bookRows {
 		bookWithCategories := BookWithCategories{
 			Book:        book,
@@ -162,7 +163,7 @@ func (b *BookRepository) Delete(ctx context.Context, bookID int) error {
 		return fmt.Errorf("delete book: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return entities.ErrBookNotFound
+		return entity.ErrBookNotFound
 	}
 
 	err = b.deleteBookCategories(ctx, bookID)
@@ -173,7 +174,7 @@ func (b *BookRepository) Delete(ctx context.Context, bookID int) error {
 	return nil
 }
 
-func (b *BookRepository) Update(ctx context.Context, changes *entities.Book) (*entities.Book, error) {
+func (b *BookRepository) Update(ctx context.Context, changes IRepository.IBook) (*entity.Book, error) {
 	db := txFromContext(ctx, b.pool)
 	query := `
 		UPDATE books
@@ -192,7 +193,7 @@ func (b *BookRepository) Update(ctx context.Context, changes *entities.Book) (*e
 	bookRow, err := pgx.CollectOneRow(row, pgx.RowToStructByName[Book])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, entities.ErrBookNotFound
+			return nil, entity.ErrBookNotFound
 		}
 		if err = mapPostgresError(err); err != nil {
 			return nil, fmt.Errorf("error map pgs error: %w", err)
@@ -335,14 +336,14 @@ func (b *BookRepository) GetCategoriesByBookIDs(ctx context.Context, bookIDs []i
 	return result, nil
 }
 
-func toDomainBook(b *BookWithCategories) *entities.Book {
+func toDomainBook(b *BookWithCategories) *entity.Book {
 	var description *string
 
 	if b.Description.Valid {
 		description = &b.Description.String
 	}
 
-	return entities.HydrateBook(
+	return entity.HydrateBook(
 		b.ID,
 		b.Title,
 		b.Year,

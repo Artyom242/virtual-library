@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"virtual-library/catalog-service/internal/app/interfaces"
+	"virtual-library/catalog-service/internal/app/interface"
 	"virtual-library/catalog-service/internal/httpapi/generated"
 )
 
@@ -14,9 +14,9 @@ type CombinedHandler struct {
 var _ generated.ServerInterface = (*CombinedHandler)(nil)
 
 func NewCombinedHandler(
-	bookService interfaces.BookService,
-	authorService interfaces.AuthorService,
-	categoryService interfaces.CategoryService,
+	bookService _interface.BookService,
+	authorService _interface.AuthorService,
+	categoryService _interface.CategoryService,
 ) *CombinedHandler {
 	return &CombinedHandler{
 		BookHandler:     NewBookHandler(bookService),

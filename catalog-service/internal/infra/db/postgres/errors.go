@@ -2,7 +2,7 @@ package postgres
 
 import (
 	"errors"
-	"virtual-library/catalog-service/internal/domain/entities"
+	"virtual-library/catalog-service/internal/domain/entity"
 
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -23,11 +23,11 @@ func mapPostgresError(err error) error {
 
 	switch pgErr.ConstraintName {
 	case "fk_books_authors":
-		return entities.ErrAuthorNotFound
+		return entity.ErrAuthorNotFound
 	case "fk_book_categories_books":
-		return entities.ErrBookNotFound
+		return entity.ErrBookNotFound
 	case "fk_book_categories_categories":
-		return entities.ErrCategoryNotFound
+		return entity.ErrCategoryNotFound
 	}
 
 	return nil

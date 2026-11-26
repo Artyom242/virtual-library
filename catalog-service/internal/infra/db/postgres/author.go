@@ -5,9 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"virtual-library/catalog-service/internal/app"
-	"virtual-library/catalog-service/internal/domain/entities"
-	"virtual-library/catalog-service/internal/domain/repositories"
+	"virtual-library/catalog-service/internal/domain/entity"
+	"virtual-library/catalog-service/internal/domain/repository"
 	"virtual-library/catalog-service/internal/httpapi/pagination"
+	IRepository "virtual-library/catalog-service/internal/infra/db/repository"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -30,9 +31,9 @@ func NewAuthorRepository(pool *pgxpool.Pool) *AuthorRepository {
 	return &AuthorRepository{pool: pool}
 }
 
-var _ repositories.AuthorRepository = (*AuthorRepository)(nil)
+var _ repository.AuthorRepository = (*AuthorRepository)(nil)
 
-func (a *AuthorRepository) Create(c context.Context, author *entities.Author) (*entities.Author, error) {
+func (a *AuthorRepository) Create(c context.Context, author IRepository.IAuthor) (*entity.Author, error) {
 	db := txFromContext(c, a.pool)
 
 	query := "INSERT INTO authors(name) VALUES($1) returning id, name"
@@ -56,7 +57,7 @@ func (a *AuthorRepository) Create(c context.Context, author *entities.Author) (*
 	return newAuthor, nil
 }
 
-func (a *AuthorRepository) GetByID(c context.Context, authorID int) (*entities.Author, error) {
+func (a *AuthorRepository) GetByID(c context.Context, authorID int) (*entity.Author, error) {
 	db := txFromContext(c, a.pool)
 
 	query := "SELECT authors.id, authors.name FROM authors WHERE id = $1"
@@ -68,7 +69,7 @@ func (a *AuthorRepository) GetByID(c context.Context, authorID int) (*entities.A
 	authorRow, err := pgx.CollectOneRow(row, pgx.RowToStructByName[Author])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, entities.ErrAuthorNotFound
+			return nil, entity.ErrAuthorNotFound
 		}
 		return nil, fmt.Errorf("scan author: %w", err)
 	}
@@ -78,7 +79,7 @@ func (a *AuthorRepository) GetByID(c context.Context, authorID int) (*entities.A
 	return author, nil
 }
 
-func (a *AuthorRepository) GetAll(c context.Context, pagination *pagination.Pagination) ([]*entities.Author, int, error) {
+func (a *AuthorRepository) GetAll(c context.Context, pagination *pagination.Pagination) ([]*entity.Author, int, error) {
 	db := txFromContext(c, a.pool)
 
 	query := `
@@ -109,7 +110,7 @@ func (a *AuthorRepository) GetAll(c context.Context, pagination *pagination.Pagi
 	return authors, total, nil
 }
 
-func (a *AuthorRepository) GetOrCreate(ctx context.Context, author *entities.Author) (*entities.Author, error) {
+func (a *AuthorRepository) GetOrCreate(ctx context.Context, author IRepository.IAuthor) (*entity.Author, error) {
 	db := txFromContext(ctx, a.pool)
 
 	query := `
@@ -170,13 +171,13 @@ func (a *AuthorRepository) Delete(c context.Context, authorID int) error {
 		return fmt.Errorf("delete author: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return entities.ErrAuthorNotFound
+		return entity.ErrAuthorNotFound
 	}
 
 	return nil
 }
 
-func (a *AuthorRepository) Update(c context.Context, author *entities.Author) (*entities.Author, error) {
+func (a *AuthorRepository) Update(c context.Context, author IRepository.IAuthor) (*entity.Author, error) {
 	db := txFromContext(c, a.pool)
 
 	query := `UPDATE authors 
@@ -195,7 +196,7 @@ func (a *AuthorRepository) Update(c context.Context, author *entities.Author) (*
 			return nil, app.ErrAuthorAlreadyExists
 		}
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, entities.ErrAuthorNotFound
+			return nil, entity.ErrAuthorNotFound
 		}
 		return nil, fmt.Errorf("update author: %w", err)
 	}
@@ -205,8 +206,8 @@ func (a *AuthorRepository) Update(c context.Context, author *entities.Author) (*
 	return newAuthor, nil
 }
 
-func toDomainAuthors(authorRows []Author) []*entities.Author {
-	authors := make([]*entities.Author, 0, len(authorRows))
+func toDomainAuthors(authorRows []Author) []*entity.Author {
+	authors := make([]*entity.Author, 0, len(authorRows))
 
 	for _, row := range authorRows {
 		author := toDomainAuthor(&row)
@@ -216,8 +217,8 @@ func toDomainAuthors(authorRows []Author) []*entities.Author {
 	return authors
 }
 
-func toDomainAuthor(a *Author) *entities.Author {
-	return entities.HydrateAuthor(
+func toDomainAuthor(a *Author) *entity.Author {
+	return entity.HydrateAuthor(
 		a.ID,
 		a.Name,
 	)

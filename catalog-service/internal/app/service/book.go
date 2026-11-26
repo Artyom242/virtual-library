@@ -1,4 +1,4 @@
-package services
+package service
 
 import (
 	"context"
@@ -6,23 +6,23 @@ import (
 	"fmt"
 	"virtual-library/catalog-service/internal/app"
 	"virtual-library/catalog-service/internal/app/command"
-	"virtual-library/catalog-service/internal/app/interfaces"
-	"virtual-library/catalog-service/internal/domain/entities"
-	"virtual-library/catalog-service/internal/domain/repositories"
+	"virtual-library/catalog-service/internal/app/interface"
+	"virtual-library/catalog-service/internal/domain/entity"
+	"virtual-library/catalog-service/internal/domain/repository"
 	"virtual-library/catalog-service/internal/httpapi/pagination"
 )
 
 type BookService struct {
 	tx         app.Transactor
-	repoBook   repositories.BookRepository
-	repoAuthor repositories.AuthorRepository
+	repoBook   repository.BookRepository
+	repoAuthor repository.AuthorRepository
 }
 
 func NewService(
 	tx app.Transactor,
-	repoBook repositories.BookRepository,
-	repoAuthor repositories.AuthorRepository,
-) interfaces.BookService {
+	repoBook repository.BookRepository,
+	repoAuthor repository.AuthorRepository,
+) _interface.BookService {
 	return &BookService{
 		tx:         tx,
 		repoBook:   repoBook,
@@ -30,18 +30,18 @@ func NewService(
 	}
 }
 
-func (s *BookService) CreateBook(ctx context.Context, bookCommand *command.CreateBookCommand) (*entities.Book, error) {
-	var newBook *entities.Book
+func (s *BookService) CreateBook(ctx context.Context, bookCommand *command.CreateBookCommand) (*entity.Book, error) {
+	var newBook *entity.Book
 	err := s.tx.Do(ctx, func(ctx context.Context) error {
 		_, err := s.repoAuthor.GetByID(ctx, bookCommand.AuthorID)
 		if err != nil {
-			if errors.Is(err, entities.ErrAuthorNotFound) {
-				return entities.ErrAuthorNotFound
+			if errors.Is(err, entity.ErrAuthorNotFound) {
+				return entity.ErrAuthorNotFound
 			}
 			return err
 		}
 
-		book, err := entities.NewBook(
+		book, err := entity.NewBook(
 			bookCommand.Title,
 			bookCommand.Year,
 			bookCommand.AuthorID,
@@ -66,11 +66,11 @@ func (s *BookService) CreateBook(ctx context.Context, bookCommand *command.Creat
 	return newBook, nil
 }
 
-func (s *BookService) GetBookByID(ctx context.Context, id int) (*entities.Book, error) {
+func (s *BookService) GetBookByID(ctx context.Context, id int) (*entity.Book, error) {
 	return s.repoBook.GetByID(ctx, id)
 }
 
-func (s *BookService) GetAllBooks(ctx context.Context, pagination *pagination.Pagination) ([]*entities.Book, int, error) {
+func (s *BookService) GetAllBooks(ctx context.Context, pagination *pagination.Pagination) ([]*entity.Book, int, error) {
 	return s.repoBook.GetAll(ctx, pagination)
 }
 
@@ -78,8 +78,8 @@ func (s *BookService) DeleteBook(ctx context.Context, id int) error {
 	return s.repoBook.Delete(ctx, id)
 }
 
-func (s *BookService) UpdateBook(ctx context.Context, bookCommand *command.UpdateBookCommand) (*entities.Book, error) {
-	var updatedBook *entities.Book
+func (s *BookService) UpdateBook(ctx context.Context, bookCommand *command.UpdateBookCommand) (*entity.Book, error) {
+	var updatedBook *entity.Book
 	err := s.tx.Do(ctx, func(ctx context.Context) error {
 		book, err := s.GetBookByID(ctx, bookCommand.ID)
 		if err != nil {
@@ -93,7 +93,7 @@ func (s *BookService) UpdateBook(ctx context.Context, bookCommand *command.Updat
 			}
 		}
 
-		bookChanges := entities.BookChanges{
+		bookChanges := entity.BookChanges{
 			Title:         bookCommand.Title,
 			Year:          bookCommand.Year,
 			AuthorID:      bookCommand.AuthorID,
@@ -121,11 +121,11 @@ func (s *BookService) UpdateBook(ctx context.Context, bookCommand *command.Updat
 	return updatedBook, nil
 }
 
-func (s *BookService) CreateBookWithNewAuthor(ctx context.Context, commandBook *command.CreateBookCommand, commandAuthor *command.CreateAuthorCommand) (*entities.Book, error) {
-	var createdBook *entities.Book
+func (s *BookService) CreateBookWithNewAuthor(ctx context.Context, commandBook *command.CreateBookCommand, commandAuthor *command.CreateAuthorCommand) (*entity.Book, error) {
+	var createdBook *entity.Book
 
 	err := s.tx.Do(ctx, func(ctx context.Context) error {
-		createAuthor, err := entities.NewAuthor(commandAuthor.Name)
+		createAuthor, err := entity.NewAuthor(commandAuthor.Name)
 		if err != nil {
 			return fmt.Errorf("create author: %w", err)
 		}
@@ -135,7 +135,7 @@ func (s *BookService) CreateBookWithNewAuthor(ctx context.Context, commandBook *
 			return fmt.Errorf("created author: %w", err)
 		}
 
-		newBook, err := entities.NewBook(
+		newBook, err := entity.NewBook(
 			commandBook.Title,
 			commandBook.Year,
 			createdAuthor.ID(),

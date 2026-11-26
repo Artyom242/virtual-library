@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 	"virtual-library/catalog-service/internal/app/command"
-	"virtual-library/catalog-service/internal/app/interfaces"
-	"virtual-library/catalog-service/internal/domain/entities"
+	"virtual-library/catalog-service/internal/app/interface"
+	"virtual-library/catalog-service/internal/domain/entity"
 	errorHandler "virtual-library/catalog-service/internal/httpapi/errorhandler"
 	"virtual-library/catalog-service/internal/httpapi/generated"
 	"virtual-library/catalog-service/internal/httpapi/mapper"
@@ -16,10 +16,10 @@ import (
 )
 
 type CategoryHandler struct {
-	service interfaces.CategoryService
+	service _interface.CategoryService
 }
 
-func NewCategoryHandler(service interfaces.CategoryService) *CategoryHandler {
+func NewCategoryHandler(service _interface.CategoryService) *CategoryHandler {
 	return &CategoryHandler{
 		service: service,
 	}
@@ -75,7 +75,7 @@ func (h *CategoryHandler) GetCategoryById(c *gin.Context, id generated.ID) {
 	ctx := c.Request.Context()
 	if !validation.IsIDMoreThanOne(id) {
 		c.JSON(http.StatusBadRequest, generated.ErrorResponse{
-			Message: entities.ErrInvalidCategoryID.Error(),
+			Message: entity.ErrInvalidCategoryID.Error(),
 		})
 		return
 	}
@@ -95,7 +95,7 @@ func (h *CategoryHandler) UpdateCategory(c *gin.Context, id generated.ID) {
 	ctx := c.Request.Context()
 	if !validation.IsIDMoreThanOne(id) {
 		c.JSON(http.StatusBadRequest, generated.ErrorResponse{
-			Message: entities.ErrInvalidCategoryID.Error(),
+			Message: entity.ErrInvalidCategoryID.Error(),
 		})
 		return
 	}
@@ -130,7 +130,7 @@ func (h *CategoryHandler) DeleteCategory(c *gin.Context, id generated.ID) {
 	ctx := c.Request.Context()
 	if !validation.IsIDMoreThanOne(id) {
 		c.JSON(http.StatusBadRequest, generated.ErrorResponse{
-			Message: entities.ErrInvalidCategoryID.Error(),
+			Message: entity.ErrInvalidCategoryID.Error(),
 		})
 		return
 	}

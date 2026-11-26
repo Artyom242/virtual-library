@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"virtual-library/catalog-service/internal/app"
-	"virtual-library/catalog-service/internal/domain/entities"
+	"virtual-library/catalog-service/internal/domain/entity"
 	"virtual-library/catalog-service/internal/httpapi/middleware"
 
 	"github.com/gin-gonic/gin"
@@ -39,26 +39,26 @@ func HandleCatalogError(
 		level = slog.LevelWarn
 		message = ErrInvalidRequest
 
-	case errors.Is(err, entities.ErrValidationError):
+	case errors.Is(err, entity.ErrValidationError):
 		status = http.StatusBadRequest
 		level = slog.LevelWarn
-		message = entities.ErrValidationError.Error()
+		message = entity.ErrValidationError.Error()
 
 	// Book errors
-	case errors.Is(err, entities.ErrBookNotFound):
+	case errors.Is(err, entity.ErrBookNotFound):
 		status = http.StatusNotFound
 		level = slog.LevelWarn
-		message = entities.ErrBookNotFound.Error()
+		message = entity.ErrBookNotFound.Error()
 
-	case errors.Is(err, entities.ErrInvalidBookData):
+	case errors.Is(err, entity.ErrInvalidBookData):
 		status = http.StatusBadRequest
 		level = slog.LevelWarn
-		message = entities.ErrInvalidBookData.Error()
+		message = entity.ErrInvalidBookData.Error()
 
-	case errors.Is(err, entities.ErrInvalidBookDescription):
+	case errors.Is(err, entity.ErrInvalidBookDescription):
 		status = http.StatusBadRequest
 		level = slog.LevelWarn
-		message = entities.ErrInvalidBookDescription.Error()
+		message = entity.ErrInvalidBookDescription.Error()
 
 	case errors.Is(err, app.ErrEmptyBookPatch):
 		status = http.StatusBadRequest
@@ -66,15 +66,15 @@ func HandleCatalogError(
 		message = app.ErrEmptyBookPatch.Error()
 
 	// Author errors
-	case errors.Is(err, entities.ErrAuthorNotFound):
+	case errors.Is(err, entity.ErrAuthorNotFound):
 		status = http.StatusNotFound
 		level = slog.LevelWarn
-		message = entities.ErrAuthorNotFound.Error()
+		message = entity.ErrAuthorNotFound.Error()
 
-	case errors.Is(err, entities.ErrInvalidAuthorData):
+	case errors.Is(err, entity.ErrInvalidAuthorData):
 		status = http.StatusBadRequest
 		level = slog.LevelWarn
-		message = entities.ErrInvalidAuthorData.Error()
+		message = entity.ErrInvalidAuthorData.Error()
 
 	case errors.Is(err, app.ErrAuthorAlreadyExists):
 		status = http.StatusConflict
@@ -92,15 +92,15 @@ func HandleCatalogError(
 		message = app.ErrAuthorHasBooks.Error()
 
 	// Category errors
-	case errors.Is(err, entities.ErrCategoryNotFound):
+	case errors.Is(err, entity.ErrCategoryNotFound):
 		status = http.StatusNotFound
 		level = slog.LevelWarn
-		message = entities.ErrCategoryNotFound.Error()
+		message = entity.ErrCategoryNotFound.Error()
 
-	case errors.Is(err, entities.ErrCategoryAlreadyExists):
+	case errors.Is(err, entity.ErrCategoryAlreadyExists):
 		status = http.StatusConflict
 		level = slog.LevelWarn
-		message = entities.ErrCategoryAlreadyExists.Error()
+		message = entity.ErrCategoryAlreadyExists.Error()
 
 	default:
 		status = http.StatusInternalServerError

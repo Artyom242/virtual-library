@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"virtual-library/catalog-service/internal/domain/entities"
-	"virtual-library/catalog-service/internal/domain/repositories"
+	"virtual-library/catalog-service/internal/domain/entity"
+	"virtual-library/catalog-service/internal/domain/repository"
 	"virtual-library/catalog-service/internal/httpapi/pagination"
+	IRepository "virtual-library/catalog-service/internal/infra/db/repository"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -29,9 +30,9 @@ func NewCategoryRepository(pool *pgxpool.Pool) *CategoryRepository {
 	return &CategoryRepository{pool: pool}
 }
 
-var _ repositories.CategoryRepository = (*CategoryRepository)(nil)
+var _ repository.CategoryRepository = (*CategoryRepository)(nil)
 
-func (c *CategoryRepository) Create(ctx context.Context, category *entities.Category) (*entities.Category, error) {
+func (c *CategoryRepository) Create(ctx context.Context, category IRepository.ICategory) (*entity.Category, error) {
 	db := txFromContext(ctx, c.pool)
 
 	query := "INSERT INTO categories(name) VALUES($1) returning id, name"
@@ -39,7 +40,7 @@ func (c *CategoryRepository) Create(ctx context.Context, category *entities.Cate
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
-			return nil, entities.ErrCategoryAlreadyExists
+			return nil, entity.ErrCategoryAlreadyExists
 		}
 		return nil, fmt.Errorf("create category: %w", err)
 	}
@@ -53,7 +54,7 @@ func (c *CategoryRepository) Create(ctx context.Context, category *entities.Cate
 	return newCategory, nil
 }
 
-func (c *CategoryRepository) GetByID(ctx context.Context, categoryID int) (*entities.Category, error) {
+func (c *CategoryRepository) GetByID(ctx context.Context, categoryID int) (*entity.Category, error) {
 	db := txFromContext(ctx, c.pool)
 
 	query := "SELECT categories.id, categories.name FROM categories WHERE id = $1"
@@ -65,7 +66,7 @@ func (c *CategoryRepository) GetByID(ctx context.Context, categoryID int) (*enti
 	categoryRow, err := pgx.CollectOneRow(row, pgx.RowToStructByName[Category])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, entities.ErrCategoryNotFound
+			return nil, entity.ErrCategoryNotFound
 		}
 		return nil, fmt.Errorf("scan category: %w", err)
 	}
@@ -74,7 +75,7 @@ func (c *CategoryRepository) GetByID(ctx context.Context, categoryID int) (*enti
 	return category, nil
 }
 
-func (c *CategoryRepository) GetAll(ctx context.Context, pagination *pagination.Pagination) ([]*entities.Category, int, error) {
+func (c *CategoryRepository) GetAll(ctx context.Context, pagination *pagination.Pagination) ([]*entity.Category, int, error) {
 	db := txFromContext(ctx, c.pool)
 
 	query := `
@@ -113,13 +114,13 @@ func (c *CategoryRepository) Delete(ctx context.Context, categoryID int) error {
 		return fmt.Errorf("delete category: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return entities.ErrCategoryNotFound
+		return entity.ErrCategoryNotFound
 	}
 
 	return nil
 }
 
-func (c *CategoryRepository) Update(ctx context.Context, category *entities.Category) (*entities.Category, error) {
+func (c *CategoryRepository) Update(ctx context.Context, category IRepository.ICategory) (*entity.Category, error) {
 	db := txFromContext(ctx, c.pool)
 
 	query := `UPDATE categories 
@@ -135,10 +136,10 @@ func (c *CategoryRepository) Update(ctx context.Context, category *entities.Cate
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
-			return nil, entities.ErrCategoryAlreadyExists
+			return nil, entity.ErrCategoryAlreadyExists
 		}
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, entities.ErrCategoryNotFound
+			return nil, entity.ErrCategoryNotFound
 		}
 		return nil, fmt.Errorf("update category: %w", err)
 	}
@@ -147,8 +148,8 @@ func (c *CategoryRepository) Update(ctx context.Context, category *entities.Cate
 	return newCategory, nil
 }
 
-func toDomainCategories(categoryRows []Category) []*entities.Category {
-	categories := make([]*entities.Category, 0, len(categoryRows))
+func toDomainCategories(categoryRows []Category) []*entity.Category {
+	categories := make([]*entity.Category, 0, len(categoryRows))
 
 	for _, row := range categoryRows {
 		category := toDomainCategory(&row)
@@ -158,8 +159,8 @@ func toDomainCategories(categoryRows []Category) []*entities.Category {
 	return categories
 }
 
-func toDomainCategory(c *Category) *entities.Category {
-	return entities.HydrateCategory(
+func toDomainCategory(c *Category) *entity.Category {
+	return entity.HydrateCategory(
 		c.ID,
 		c.Name,
 	)

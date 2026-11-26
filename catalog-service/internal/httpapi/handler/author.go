@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 	"virtual-library/catalog-service/internal/app/command"
-	"virtual-library/catalog-service/internal/app/interfaces"
-	"virtual-library/catalog-service/internal/domain/entities"
+	"virtual-library/catalog-service/internal/app/interface"
+	"virtual-library/catalog-service/internal/domain/entity"
 	errorHandler "virtual-library/catalog-service/internal/httpapi/errorhandler"
 	"virtual-library/catalog-service/internal/httpapi/generated"
 	"virtual-library/catalog-service/internal/httpapi/mapper"
@@ -16,10 +16,10 @@ import (
 )
 
 type AuthorHandler struct {
-	service interfaces.AuthorService
+	service _interface.AuthorService
 }
 
-func NewAuthorHandler(service interfaces.AuthorService) *AuthorHandler {
+func NewAuthorHandler(service _interface.AuthorService) *AuthorHandler {
 	return &AuthorHandler{
 		service: service,
 	}
@@ -75,7 +75,7 @@ func (h *AuthorHandler) GetAuthorById(c *gin.Context, id generated.ID) {
 	ctx := c.Request.Context()
 	if !validation.IsIDMoreThanOne(id) {
 		c.JSON(http.StatusBadRequest, generated.ErrorResponse{
-			Message: entities.ErrInvalidAuthorID.Error(),
+			Message: entity.ErrInvalidAuthorID.Error(),
 		})
 		return
 	}
@@ -95,7 +95,7 @@ func (h *AuthorHandler) UpdateAuthor(c *gin.Context, id generated.ID) {
 	ctx := c.Request.Context()
 	if !validation.IsIDMoreThanOne(id) {
 		c.JSON(http.StatusBadRequest, generated.ErrorResponse{
-			Message: entities.ErrInvalidAuthorID.Error(),
+			Message: entity.ErrInvalidAuthorID.Error(),
 		})
 		return
 	}
@@ -130,7 +130,7 @@ func (h *AuthorHandler) DeleteAuthor(c *gin.Context, id generated.ID) {
 	ctx := c.Request.Context()
 	if !validation.IsIDMoreThanOne(id) {
 		c.JSON(http.StatusBadRequest, generated.ErrorResponse{
-			Message: entities.ErrInvalidAuthorID.Error(),
+			Message: entity.ErrInvalidAuthorID.Error(),
 		})
 		return
 	}

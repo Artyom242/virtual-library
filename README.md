@@ -256,7 +256,7 @@ docker compose ps
 ### 4. Запустить Catalog Service
 
 ```bash
-cd catalog-services
+cd catalog-service
 go mod download
 go run ./cmd/catalog
 ```
@@ -320,7 +320,7 @@ DATABASE_URL=postgres://your_user:your_password@localhost:5432/virtual_library?s
 Проверка Go-модуля выполняется командой из каталога сервиса:
 
 ```bash
-cd catalog-services
+cd catalog-service
 go test ./...
 ```
 
