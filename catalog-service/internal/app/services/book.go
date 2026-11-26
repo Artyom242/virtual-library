@@ -31,25 +31,39 @@ func NewService(
 }
 
 func (s *BookService) CreateBook(ctx context.Context, bookCommand *command.CreateBookCommand) (*entities.Book, error) {
-	_, err := s.repoAuthor.GetByID(ctx, bookCommand.AuthorID)
-	if errors.Is(err, entities.ErrAuthorNotFound) {
-		return nil, entities.ErrAuthorNotFound
-	}
+	var newBook *entities.Book
+	err := s.tx.Do(ctx, func(ctx context.Context) error {
+		_, err := s.repoAuthor.GetByID(ctx, bookCommand.AuthorID)
+		if err != nil {
+			if errors.Is(err, entities.ErrAuthorNotFound) {
+				return entities.ErrAuthorNotFound
+			}
+			return err
+		}
+
+		book, err := entities.NewBook(
+			bookCommand.Title,
+			bookCommand.Year,
+			bookCommand.AuthorID,
+			bookCommand.Description,
+			bookCommand.CategoryIDs,
+		)
+		if err != nil {
+			return err
+		}
+
+		newBook, err = s.repoBook.Create(ctx, book)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	newBook, err := entities.NewBook(
-		bookCommand.Title,
-		bookCommand.Year,
-		bookCommand.AuthorID,
-		bookCommand.Description,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.repoBook.Create(ctx, newBook)
+	return newBook, nil
 }
 
 func (s *BookService) GetBookByID(ctx context.Context, id int) (*entities.Book, error) {
@@ -80,10 +94,11 @@ func (s *BookService) UpdateBook(ctx context.Context, bookCommand *command.Updat
 		}
 
 		bookChanges := entities.BookChanges{
-			Title:       bookCommand.Title,
-			Year:        bookCommand.Year,
-			AuthorID:    bookCommand.AuthorID,
-			Description: bookCommand.Description,
+			Title:         bookCommand.Title,
+			Year:          bookCommand.Year,
+			AuthorID:      bookCommand.AuthorID,
+			Description:   bookCommand.Description,
+			CategoriesIDs: bookCommand.CategoryIDs,
 		}
 
 		err = book.ApplyChanges(bookChanges)
@@ -125,6 +140,7 @@ func (s *BookService) CreateBookWithNewAuthor(ctx context.Context, commandBook *
 			commandBook.Year,
 			createdAuthor.ID(),
 			commandBook.Description,
+			commandBook.CategoryIDs,
 		)
 		if err != nil {
 			return fmt.Errorf("create book entity: %w", err)

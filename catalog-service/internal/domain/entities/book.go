@@ -12,6 +12,7 @@ type Book struct {
 	year        int
 	authorID    int
 	description *string
+	categories  *[]int
 }
 
 func (b *Book) ID() int {
@@ -29,6 +30,10 @@ func (b *Book) AuthorID() int {
 func (b *Book) Description() *string {
 	return b.description
 }
+func (b *Book) Categories() []int {
+	return *b.categories
+}
+
 func (b *Book) validate() error {
 	if strings.Trim(b.title, " ") == "" {
 		return fmt.Errorf("%w: title is required", ErrValidationError)
@@ -46,12 +51,22 @@ func (b *Book) validate() error {
 	return nil
 }
 
-func NewBook(title string, year int, authorID int, description *string) (*Book, error) {
+func NewBook(
+	title string,
+	year int,
+	authorID int,
+	description *string,
+	categories *[]int,
+) (*Book, error) {
+	if categories == nil {
+		categories = &[]int{}
+	}
 	book := Book{
 		title:       title,
 		year:        year,
 		authorID:    authorID,
 		description: description,
+		categories:  categories,
 	}
 
 	err := book.validate()
@@ -61,21 +76,27 @@ func NewBook(title string, year int, authorID int, description *string) (*Book, 
 
 	return &book, nil
 }
-func HydrateBook(id int, title string, year int, authorID int, description *string) *Book {
+func HydrateBook(id int, title string, year int, authorID int, description *string, categories *[]int) *Book {
+	if categories == nil {
+		categories = &[]int{}
+	}
+
 	return &Book{
 		id:          id,
 		title:       title,
 		year:        year,
 		authorID:    authorID,
 		description: description,
+		categories:  categories,
 	}
 }
 
 type BookChanges struct {
-	Title       *string
-	Year        *int
-	AuthorID    *int
-	Description *string
+	Title         *string
+	Year          *int
+	AuthorID      *int
+	Description   *string
+	CategoriesIDs *[]int
 }
 
 func (b *Book) ApplyChanges(changes BookChanges) error {
@@ -97,6 +118,11 @@ func (b *Book) ApplyChanges(changes BookChanges) error {
 	if changes.Description != nil {
 		updated.description = changes.Description
 	}
+	if changes.CategoriesIDs != nil {
+		updated.categories = changes.CategoriesIDs
+	} else {
+		updated.categories = &[]int{}
+	}
 
 	if err := updated.validate(); err != nil {
 		return err
@@ -107,7 +133,7 @@ func (b *Book) ApplyChanges(changes BookChanges) error {
 }
 
 func (bc BookChanges) isEmpty() bool {
-	if bc.Title == nil && bc.Year == nil && bc.AuthorID == nil && bc.Description == nil {
+	if bc.Title == nil && bc.Year == nil && bc.AuthorID == nil && bc.Description == nil && bc.CategoriesIDs == nil {
 		return true
 	}
 	return false

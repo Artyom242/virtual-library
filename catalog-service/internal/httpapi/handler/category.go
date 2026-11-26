@@ -83,7 +83,7 @@ func (h *CategoryHandler) CreateCategory(c *gin.Context) {
 
 func (h *CategoryHandler) GetCategoryById(c *gin.Context, id generated.ID) {
 	ctx := c.Request.Context()
-	if !validation.ValidID(id) {
+	if !validation.IsIDMoreThanOne(id) {
 		c.JSON(http.StatusBadRequest, generated.ErrorResponse{
 			Message: entities.ErrInvalidCategoryID.Error(),
 		})
@@ -109,7 +109,7 @@ func (h *CategoryHandler) GetCategoryById(c *gin.Context, id generated.ID) {
 
 func (h *CategoryHandler) UpdateCategory(c *gin.Context, id generated.ID) {
 	ctx := c.Request.Context()
-	if !validation.ValidID(id) {
+	if !validation.IsIDMoreThanOne(id) {
 		c.JSON(http.StatusBadRequest, generated.ErrorResponse{
 			Message: entities.ErrInvalidCategoryID.Error(),
 		})
@@ -150,7 +150,7 @@ func (h *CategoryHandler) UpdateCategory(c *gin.Context, id generated.ID) {
 
 func (h *CategoryHandler) DeleteCategory(c *gin.Context, id generated.ID) {
 	ctx := c.Request.Context()
-	if !validation.ValidID(id) {
+	if !validation.IsIDMoreThanOne(id) {
 		c.JSON(http.StatusBadRequest, generated.ErrorResponse{
 			Message: entities.ErrInvalidCategoryID.Error(),
 		})

@@ -46,7 +46,7 @@ func (h *BookHandler) GetBooks(c *gin.Context, params generated.GetBooksParams) 
 
 func (h *BookHandler) GetBookById(c *gin.Context, id generated.ID) {
 	ctx := c.Request.Context()
-	if !validation.ValidID(id) {
+	if !validation.IsIDMoreThanOne(id) {
 		c.JSON(http.StatusBadRequest, generated.ErrorResponse{
 			Message: entities.ErrInvalidBookID.Error(),
 		})
@@ -76,9 +76,20 @@ func (h *BookHandler) CreateBook(c *gin.Context) {
 		errorHandler.HandleCatalogError(ctx, c, err, slog.String("title", request.Title))
 		return
 	}
-	if validation.ValidID(request.AuthorId) {
-		errorHandler.HandleCatalogError(ctx, c, entities.ErrInvalidAuthorID, slog.Int("author_id", request.AuthorId))
+	if !validation.IsIDMoreThanOne(request.AuthorId) {
+		errorHandler.HandleCatalogError(ctx, c, entities.ErrInvalidAuthorID,
+			slog.Int("author_id", request.AuthorId),
+		)
 		return
+	}
+
+	if request.CategoryIds != nil {
+		if !validation.IsUniqueValues(*request.CategoryIds) {
+			errorHandler.HandleCatalogError(ctx, c, entities.ErrCategoryNotUnique,
+				slog.Any("categories_ids", request.CategoryIds),
+			)
+			return
+		}
 	}
 
 	book := command.CreateBookCommand{
@@ -86,11 +97,15 @@ func (h *BookHandler) CreateBook(c *gin.Context) {
 		Year:        request.Year,
 		AuthorID:    request.AuthorId,
 		Description: request.Description,
+		CategoryIDs: request.CategoryIds,
 	}
 
 	createdBook, err := h.service.CreateBook(ctx, &book)
 	if err != nil {
-		errorHandler.HandleCatalogError(ctx, c, err, slog.Int("author_id", request.AuthorId), slog.String("title", request.Title))
+		errorHandler.HandleCatalogError(ctx, c, err,
+			slog.Int("author_id", request.AuthorId),
+			slog.String("title", request.Title),
+		)
 		return
 	}
 
@@ -121,10 +136,20 @@ func (h *BookHandler) CreateBookWithAuthor(c *gin.Context) {
 		return
 	}
 
+	if *request.CategoryIds != nil {
+		if !validation.IsUniqueValues(*request.CategoryIds) {
+			errorHandler.HandleCatalogError(ctx, c, entities.ErrCategoryNotUnique,
+				slog.Any("categories_ids", *request.CategoryIds),
+			)
+			return
+		}
+	}
+
 	commandBookWithAuthor := command.CreateBookCommand{
 		Title:       request.Title,
 		Year:        request.Year,
 		Description: request.Description,
+		CategoryIDs: request.CategoryIds,
 	}
 	commandAuthor := command.CreateAuthorCommand{
 		Name: request.AuthorName,
@@ -153,7 +178,7 @@ func (h *BookHandler) CreateBookWithAuthor(c *gin.Context) {
 
 func (h *BookHandler) DeleteBook(c *gin.Context, id generated.ID) {
 	ctx := c.Request.Context()
-	if !validation.ValidID(id) {
+	if !validation.IsIDMoreThanOne(id) {
 		c.JSON(http.StatusBadRequest, generated.ErrorResponse{
 			Message: entities.ErrInvalidBookID.Error(),
 		})
@@ -174,7 +199,7 @@ func (h *BookHandler) DeleteBook(c *gin.Context, id generated.ID) {
 
 func (h *BookHandler) UpdateBook(c *gin.Context, id generated.ID) {
 	ctx := c.Request.Context()
-	if !validation.ValidID(id) {
+	if !validation.IsIDMoreThanOne(id) {
 		c.JSON(http.StatusBadRequest, generated.ErrorResponse{
 			Message: entities.ErrInvalidBookID.Error(),
 		})
@@ -193,6 +218,7 @@ func (h *BookHandler) UpdateBook(c *gin.Context, id generated.ID) {
 		Year:        request.Year,
 		AuthorID:    request.AuthorId,
 		Description: request.Description,
+		CategoryIDs: request.CategoryIds,
 	}
 
 	book, err := h.service.UpdateBook(ctx, &bookCommand)
@@ -211,7 +237,6 @@ func (h *BookHandler) UpdateBook(c *gin.Context, id generated.ID) {
 			slog.Int("year", book.Year()),
 			slog.String("title", book.Title()),
 			slog.Int("author_id", book.AuthorID()),
-			slog.String("description", *book.Description()),
 		),
 	)
 	c.JSON(http.StatusOK, generated.UpdateBook200JSONResponse{

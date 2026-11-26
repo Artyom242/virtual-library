@@ -6,14 +6,13 @@ import (
 )
 
 func ToGeneratedBookResponse(book *entities.Book) generated.BookResponse {
-	description := book.Description()
-
 	return generated.BookResponse{
 		Id:          book.ID(),
 		Title:       book.Title(),
 		AuthorId:    book.AuthorID(),
 		Year:        book.Year(),
-		Description: description,
+		Description: book.Description(),
+		Categories:  book.Categories(),
 	}
 }
 func ToGeneratedBookResponses(books []*entities.Book) []generated.BookResponse {

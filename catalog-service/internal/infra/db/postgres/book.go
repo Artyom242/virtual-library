@@ -36,6 +36,11 @@ type Book struct {
 	Description pgtype.Text
 }
 
+type BookWithCategories struct {
+	Book
+	CategoryIDs []int
+}
+
 func (b *BookRepository) Create(ctx context.Context, book *entities.Book) (*entities.Book, error) {
 	db := txFromContext(ctx, b.pool)
 	query := `
@@ -50,10 +55,22 @@ func (b *BookRepository) Create(ctx context.Context, book *entities.Book) (*enti
 
 	bookRow, err := pgx.CollectOneRow(row, pgx.RowToStructByName[Book])
 	if err != nil {
-		return nil, mapPostgresError(err)
+		if err = mapPostgresError(err); err != nil {
+			return nil, fmt.Errorf("error map pgs error: %w", err)
+		}
+		return nil, err
 	}
 
-	newBook := toDomainBook(&bookRow)
+	err = b.SetCategories(ctx, bookRow.ID, book.Categories())
+	if err != nil {
+		return nil, fmt.Errorf("create book categories: %w", err)
+	}
+
+	bookWithCategories := BookWithCategories{
+		Book:        bookRow,
+		CategoryIDs: book.Categories(),
+	}
+	newBook := toDomainBook(&bookWithCategories)
 
 	return newBook, nil
 }
@@ -75,16 +92,140 @@ func (b *BookRepository) GetByID(ctx context.Context, bookID int) (*entities.Boo
 		return nil, fmt.Errorf("scan book: %w", err)
 	}
 
-	newBook := toDomainBook(&bookRow)
+	categoryIDs, err := b.GetCategoriesByBookID(ctx, bookID)
+	if err != nil {
+		return nil, fmt.Errorf("get book category ids: %w", err)
+	}
+
+	bookWithCategories := BookWithCategories{
+		Book:        bookRow,
+		CategoryIDs: categoryIDs,
+	}
+
+	newBook := toDomainBook(&bookWithCategories)
 
 	return newBook, nil
+}
+
+func (b *BookRepository) deleteBookCategories(ctx context.Context, bookID int) error {
+	db := txFromContext(ctx, b.pool)
+	query := `DELETE FROM book_categories WHERE book_id = $1`
+	_, err := db.Exec(ctx, query, bookID)
+	if err != nil {
+		return fmt.Errorf("delete book categories: %w", err)
+	}
+
+	return nil
+}
+
+func (b *BookRepository) SetCategories(ctx context.Context, bookID int, categories []int) error {
+	db := txFromContext(ctx, b.pool)
+	batch := &pgx.Batch{}
+	query := `
+		INSERT INTO book_categories(book_id, category_id)
+		VALUES($1, $2)
+		RETURNING category_id
+`
+	for _, categoryID := range categories {
+		batch.Queue(query, bookID, categoryID)
+	}
+
+	batchLen := batch.Len()
+	if batchLen > 0 {
+		br := db.SendBatch(ctx, batch)
+
+		for range batchLen {
+			_, err := br.Exec()
+			if err != nil {
+				if err = mapPostgresError(err); err != nil {
+					return fmt.Errorf("error map pgs error: %w", err)
+				}
+
+				closeErr := br.Close()
+				return errors.Join(
+					fmt.Errorf("create book category relation: %w", err),
+					closeErr,
+				)
+			}
+		}
+
+		if err := br.Close(); err != nil {
+			return fmt.Errorf("close book categories batch: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (b *BookRepository) GetCategoriesByBookID(ctx context.Context, bookID int) ([]int, error) {
+	db := txFromContext(ctx, b.pool)
+
+	query := `SELECT category_id FROM book_categories WHERE book_id = $1`
+	rows, err := db.Query(ctx, query, bookID)
+	if err != nil {
+		return nil, fmt.Errorf("get book_categories: %w", err)
+	}
+
+	var categories []int
+
+	for rows.Next() {
+		var categoryID int
+		if err := rows.Scan(&categoryID); err != nil {
+			return nil, fmt.Errorf("scan book_categories: %w", err)
+		}
+
+		categories = append(categories, categoryID)
+	}
+
+	return categories, nil
+}
+
+func (b *BookRepository) GetCategoriesByBookIDs(ctx context.Context, bookIDs []int) (map[int][]int, error) {
+	result := make(map[int][]int, len(bookIDs))
+
+	for _, id := range bookIDs {
+		result[id] = make([]int, 0)
+	}
+
+	if len(bookIDs) == 0 {
+		return result, nil
+	}
+
+	query := `
+        SELECT book_id, category_id
+        FROM book_categories
+        WHERE book_id = ANY($1)
+    `
+
+	db := txFromContext(ctx, b.pool)
+	rows, err := db.Query(ctx, query, bookIDs)
+	if err != nil {
+		return nil, fmt.Errorf("get categories by book ids: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var bookID, categoryID int
+
+		if err := rows.Scan(&bookID, &categoryID); err != nil {
+			return nil, err
+		}
+
+		result[bookID] = append(result[bookID], categoryID)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
 func (b *BookRepository) GetAll(ctx context.Context, pagination *pagination.Pagination) ([]*entities.Book, int, error) {
 	db := txFromContext(ctx, b.pool)
 	query := `
 		SELECT id, title, year, author_id, description
-		FROM books 
+		FROM books
 		ORDER BY id
 		LIMIT $1
 		OFFSET $2
@@ -100,12 +241,30 @@ func (b *BookRepository) GetAll(ctx context.Context, pagination *pagination.Pagi
 		return nil, 0, fmt.Errorf("scan books: %w", err)
 	}
 
-	books := toDomainBooks(bookRows)
+	bookIDs := make([]int, 0, len(bookRows))
+	for _, book := range bookRows {
+		bookIDs = append(bookIDs, book.ID)
+
+	}
+
+	categoriesByBook, err := b.GetCategoriesByBookIDs(ctx, bookIDs)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	books := make([]*entities.Book, 0, len(bookRows))
+	for _, book := range bookRows {
+		bookWithCategories := BookWithCategories{
+			Book:        book,
+			CategoryIDs: categoriesByBook[book.ID],
+		}
+		books = append(books, toDomainBook(&bookWithCategories))
+	}
 
 	var total int
 	err = db.QueryRow(ctx, "SELECT COUNT(*) FROM books").Scan(&total)
 	if err != nil {
-		return nil, 0, fmt.Errorf("count authors: %w", err)
+		return nil, 0, fmt.Errorf("count books: %w", err)
 	}
 
 	return books, total, nil
@@ -122,10 +281,15 @@ func (b *BookRepository) Delete(ctx context.Context, bookID int) error {
 		return entities.ErrBookNotFound
 	}
 
+	err = b.deleteBookCategories(ctx, bookID)
+	if err != nil {
+		return fmt.Errorf("delete book categories: %w", err)
+	}
+
 	return nil
 }
 
-func (b *BookRepository) Update(ctx context.Context, book *entities.Book) (*entities.Book, error) {
+func (b *BookRepository) Update(ctx context.Context, changes *entities.Book) (*entities.Book, error) {
 	db := txFromContext(ctx, b.pool)
 	query := `
 		UPDATE books
@@ -136,7 +300,7 @@ func (b *BookRepository) Update(ctx context.Context, book *entities.Book) (*enti
 		WHERE id = $5
 		RETURNING id, title, author_id, year, description
 	`
-	row, err := db.Query(ctx, query, book.Title(), book.Year(), book.AuthorID(), book.Description(), book.ID())
+	row, err := db.Query(ctx, query, changes.Title(), changes.Year(), changes.AuthorID(), changes.Description(), changes.ID())
 	if err != nil {
 		return nil, fmt.Errorf("update book: %w", err)
 	}
@@ -146,11 +310,29 @@ func (b *BookRepository) Update(ctx context.Context, book *entities.Book) (*enti
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, entities.ErrBookNotFound
 		}
+		if err = mapPostgresError(err); err != nil {
+			return nil, fmt.Errorf("error map pgs error: %w", err)
+		}
 
-		return nil, fmt.Errorf("update book: %w", mapPostgresError(err))
+		return nil, fmt.Errorf("update book: %w", err)
 	}
 
-	newBook := toDomainBook(&bookRow)
+	// Category
+	if changes.Categories() != nil {
+		if err = b.deleteBookCategories(ctx, bookRow.ID); err != nil {
+			return nil, fmt.Errorf("update book categories: %w", err)
+		}
+		if err = b.SetCategories(ctx, bookRow.ID, changes.Categories()); err != nil {
+			return nil, fmt.Errorf("update book categories: %w", err)
+		}
+	}
+
+	bookWithCategories := BookWithCategories{
+		Book:        bookRow,
+		CategoryIDs: changes.Categories(),
+	}
+
+	newBook := toDomainBook(&bookWithCategories)
 
 	return newBook, nil
 }
@@ -168,22 +350,16 @@ func mapPostgresError(err error) error {
 	switch pgErr.ConstraintName {
 	case "fk_books_authors":
 		return entities.ErrAuthorNotFound
+	case "fk_book_categories_books":
+		return entities.ErrBookNotFound
+	case "fk_book_categories_categories":
+		return entities.ErrCategoryNotFound
 	}
-	// add fk_books_categories case
 
-	return err
+	return nil
 }
 
-func toDomainBooks(bookRows []Book) []*entities.Book {
-	books := make([]*entities.Book, 0, len(bookRows))
-	for _, row := range bookRows {
-		book := toDomainBook(&row)
-		books = append(books, book)
-	}
-	return books
-}
-
-func toDomainBook(b *Book) *entities.Book {
+func toDomainBook(b *BookWithCategories) *entities.Book {
 	var description *string
 
 	if b.Description.Valid {
@@ -196,5 +372,6 @@ func toDomainBook(b *Book) *entities.Book {
 		b.Year,
 		b.AuthorID,
 		description,
+		&b.CategoryIDs,
 	)
 }

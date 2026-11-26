@@ -5,6 +5,7 @@ type CreateBookCommand struct {
 	Year        int
 	AuthorID    int
 	Description *string
+	CategoryIDs *[]int
 }
 
 type UpdateBookCommand struct {
@@ -13,4 +14,5 @@ type UpdateBookCommand struct {
 	AuthorID    *int
 	Year        *int
 	Description *string
+	CategoryIDs *[]int
 }

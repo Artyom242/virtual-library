@@ -39,7 +39,7 @@ func (c *CategoryRepository) Create(ctx context.Context, category *entities.Cate
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
-			return nil, fmt.Errorf("create category: %w", err)
+			return nil, entities.ErrCategoryAlreadyExists
 		}
 		return nil, fmt.Errorf("create category: %w", err)
 	}
@@ -65,7 +65,7 @@ func (c *CategoryRepository) GetByID(ctx context.Context, categoryID int) (*enti
 	categoryRow, err := pgx.CollectOneRow(row, pgx.RowToStructByName[Category])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("category not found: %w", err)
+			return nil, entities.ErrCategoryNotFound
 		}
 		return nil, fmt.Errorf("scan category: %w", err)
 	}
@@ -113,7 +113,7 @@ func (c *CategoryRepository) Delete(ctx context.Context, categoryID int) error {
 		return fmt.Errorf("delete category: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("category not found")
+		return entities.ErrCategoryNotFound
 	}
 
 	return nil
@@ -135,10 +135,10 @@ func (c *CategoryRepository) Update(ctx context.Context, category *entities.Cate
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
-			return nil, fmt.Errorf("category already exists: %w", err)
+			return nil, entities.ErrCategoryAlreadyExists
 		}
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("category not found: %w", err)
+			return nil, entities.ErrCategoryNotFound
 		}
 		return nil, fmt.Errorf("update category: %w", err)
 	}

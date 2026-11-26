@@ -83,7 +83,7 @@ func (h *AuthorHandler) CreateAuthor(c *gin.Context) {
 
 func (h *AuthorHandler) GetAuthorById(c *gin.Context, id generated.ID) {
 	ctx := c.Request.Context()
-	if !validation.ValidID(id) {
+	if !validation.IsIDMoreThanOne(id) {
 		c.JSON(http.StatusBadRequest, generated.ErrorResponse{
 			Message: entities.ErrInvalidAuthorID.Error(),
 		})
@@ -109,7 +109,7 @@ func (h *AuthorHandler) GetAuthorById(c *gin.Context, id generated.ID) {
 
 func (h *AuthorHandler) UpdateAuthor(c *gin.Context, id generated.ID) {
 	ctx := c.Request.Context()
-	if !validation.ValidID(id) {
+	if !validation.IsIDMoreThanOne(id) {
 		c.JSON(http.StatusBadRequest, generated.ErrorResponse{
 			Message: entities.ErrInvalidAuthorID.Error(),
 		})
@@ -150,7 +150,7 @@ func (h *AuthorHandler) UpdateAuthor(c *gin.Context, id generated.ID) {
 
 func (h *AuthorHandler) DeleteAuthor(c *gin.Context, id generated.ID) {
 	ctx := c.Request.Context()
-	if !validation.ValidID(id) {
+	if !validation.IsIDMoreThanOne(id) {
 		c.JSON(http.StatusBadRequest, generated.ErrorResponse{
 			Message: entities.ErrInvalidAuthorID.Error(),
 		})

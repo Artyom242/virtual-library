@@ -33,12 +33,12 @@ type BookMutationResponse struct {
 
 // BookResponse defines model for BookResponse.
 type BookResponse struct {
-	AuthorId    int           `json:"author_id"`
-	Categories  []interface{} `json:"categories"`
-	Description *string       `json:"description"`
-	Id          int           `json:"id"`
-	Title       string        `json:"title"`
-	Year        int           `json:"year"`
+	AuthorId    int     `json:"author_id"`
+	Categories  []int   `json:"categories"`
+	Description *string `json:"description"`
+	Id          int     `json:"id"`
+	Title       string  `json:"title"`
+	Year        int     `json:"year"`
 }
 
 // CategoryMutationResponse defines model for CategoryMutationResponse.
@@ -69,6 +69,7 @@ type CreateBookRequest struct {
 // CreateBookWithAuthorRequest defines model for CreateBookWithAuthorRequest.
 type CreateBookWithAuthorRequest struct {
 	AuthorName  string  `json:"author_name"`
+	CategoryIds *[]int  `json:"category_ids,omitempty"`
 	Description *string `json:"description,omitempty"`
 	Title       string  `json:"title"`
 	Year        int     `json:"year"`
@@ -92,6 +93,7 @@ type UpdateAuthorRequest struct {
 // UpdateBookRequest defines model for UpdateBookRequest.
 type UpdateBookRequest struct {
 	AuthorId    *int    `json:"author_id,omitempty"`
+	CategoryIds *[]int  `json:"category_ids,omitempty"`
 	Description *string `json:"description,omitempty"`
 	Title       *string `json:"title,omitempty"`
 	Year        *int    `json:"year,omitempty"`

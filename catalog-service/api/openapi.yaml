@@ -456,6 +456,8 @@ components:
           nullable: true
         categories:
           type: array
+          items:
+            type: integer
       required:
         - id
         - title
@@ -517,6 +519,12 @@ components:
         description:
           type: string
           nullable: true
+        category_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+          uniqueItems: true
 
     CreateBookWithAuthorRequest:
       type: object
@@ -533,6 +541,12 @@ components:
         description:
           type: string
           nullable: true
+        category_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+          uniqueItems: true
       required:
         - title
         - year
