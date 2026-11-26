@@ -41,10 +41,6 @@ func (h *AuthorHandler) GetAuthors(c *gin.Context, params generated.GetAuthorsPa
 		response = append(response, mapper.ToGeneratedAuthorResponse(author))
 	}
 
-	slog.InfoContext(ctx, "got all authors",
-		slog.Int("count", len(authors)),
-		slog.Int("total", total),
-	)
 	c.JSON(http.StatusOK, generated.GetAuthors200JSONResponse{
 		Data:  response,
 		Total: total,
@@ -70,12 +66,6 @@ func (h *AuthorHandler) CreateAuthor(c *gin.Context) {
 		return
 	}
 
-	slog.InfoContext(ctx, "created author",
-		slog.Group("author",
-			slog.Int("id", createdAuthor.ID()),
-			slog.String("name", createdAuthor.Name()),
-		),
-	)
 	c.JSON(http.StatusOK, generated.CreateAuthor201JSONResponse{
 		Data: mapper.ToGeneratedAuthorResponse(createdAuthor),
 	})
@@ -96,12 +86,6 @@ func (h *AuthorHandler) GetAuthorById(c *gin.Context, id generated.ID) {
 		return
 	}
 
-	slog.InfoContext(ctx, "author found",
-		slog.Group("author",
-			slog.Int("id", author.ID()),
-			slog.String("name", author.Name()),
-		),
-	)
 	c.JSON(http.StatusOK, generated.GetAuthorById200JSONResponse{
 		Data: mapper.ToGeneratedAuthorResponse(author),
 	})
@@ -137,12 +121,6 @@ func (h *AuthorHandler) UpdateAuthor(c *gin.Context, id generated.ID) {
 		return
 	}
 
-	slog.InfoContext(ctx, "updated author",
-		slog.Group("author",
-			slog.Int("id", id),
-			slog.String("name", author.Name()),
-		),
-	)
 	c.JSON(http.StatusOK, generated.UpdateAuthor200JSONResponse{
 		Data: mapper.ToGeneratedAuthorResponse(author),
 	})
@@ -163,8 +141,5 @@ func (h *AuthorHandler) DeleteAuthor(c *gin.Context, id generated.ID) {
 		return
 	}
 
-	slog.InfoContext(ctx, "author deleted",
-		slog.Int("author_id", id),
-	)
 	c.Status(http.StatusNoContent)
 }

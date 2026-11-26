@@ -34,10 +34,6 @@ func (h *BookHandler) GetBooks(c *gin.Context, params generated.GetBooksParams) 
 	}
 
 	response := mapper.ToGeneratedBookResponses(books)
-
-	slog.InfoContext(ctx, "got all books",
-		slog.Int("count", len(books)),
-	)
 	c.JSON(http.StatusOK, generated.GetBooks200JSONResponse{
 		Data:  response,
 		Total: total,
@@ -59,10 +55,6 @@ func (h *BookHandler) GetBookById(c *gin.Context, id generated.ID) {
 		return
 	}
 
-	slog.InfoContext(ctx, "book found",
-		slog.Int("book_id", id),
-		slog.Any("book", book),
-	)
 	c.JSON(http.StatusOK, generated.GetBookById200JSONResponse{
 		Data: mapper.ToGeneratedBookResponse(book),
 	})
@@ -110,15 +102,6 @@ func (h *BookHandler) CreateBook(c *gin.Context) {
 	}
 
 	response := mapper.ToGeneratedBookResponse(createdBook)
-	slog.InfoContext(ctx, "created book",
-		slog.Group("book",
-			slog.Int("id", createdBook.ID()),
-			slog.Int("year", createdBook.Year()),
-			slog.String("title", createdBook.Title()),
-			slog.Int("author_id", createdBook.AuthorID()),
-			slog.Any("description", createdBook.Description()),
-		),
-	)
 	c.JSON(http.StatusCreated, generated.CreateBook201JSONResponse{
 		Data: response,
 	})
@@ -162,15 +145,6 @@ func (h *BookHandler) CreateBookWithAuthor(c *gin.Context) {
 	}
 
 	response := mapper.ToGeneratedBookResponse(createdBook)
-	slog.InfoContext(ctx, "created book with new author",
-		slog.Group("book",
-			slog.Int("id", createdBook.ID()),
-			slog.Int("year", createdBook.Year()),
-			slog.String("title", createdBook.Title()),
-			slog.Int("author_id", createdBook.AuthorID()),
-			slog.Any("description", createdBook.Description()),
-		),
-	)
 	c.JSON(http.StatusCreated, generated.CreateBookWithAuthor201JSONResponse{
 		Data: response,
 	})
@@ -191,9 +165,6 @@ func (h *BookHandler) DeleteBook(c *gin.Context, id generated.ID) {
 		return
 	}
 
-	slog.InfoContext(ctx, "book deleted",
-		slog.Int("book_id", id),
-	)
 	c.Status(http.StatusNoContent)
 }
 
@@ -231,14 +202,6 @@ func (h *BookHandler) UpdateBook(c *gin.Context, id generated.ID) {
 		return
 	}
 
-	slog.InfoContext(ctx, "updated book",
-		slog.Group("new_book",
-			slog.Int("book_id", id),
-			slog.Int("year", book.Year()),
-			slog.String("title", book.Title()),
-			slog.Int("author_id", book.AuthorID()),
-		),
-	)
 	c.JSON(http.StatusOK, generated.UpdateBook200JSONResponse{
 		Data: mapper.ToGeneratedBookResponse(book),
 	})

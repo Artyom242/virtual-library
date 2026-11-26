@@ -8,9 +8,7 @@ import (
 	"virtual-library/catalog-service/internal/domain/repositories"
 	"virtual-library/catalog-service/internal/httpapi/pagination"
 
-	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -100,6 +98,122 @@ func (b *BookRepository) GetByID(ctx context.Context, bookID int) (*entities.Boo
 	bookWithCategories := BookWithCategories{
 		Book:        bookRow,
 		CategoryIDs: categoryIDs,
+	}
+
+	newBook := toDomainBook(&bookWithCategories)
+
+	return newBook, nil
+}
+
+func (b *BookRepository) GetAll(ctx context.Context, pagination *pagination.Pagination) ([]*entities.Book, int, error) {
+	db := txFromContext(ctx, b.pool)
+	query := `
+		SELECT id, title, year, author_id, description
+		FROM books
+		ORDER BY id
+		LIMIT $1
+		OFFSET $2
+`
+
+	rows, err := db.Query(ctx, query, pagination.Limit(), pagination.Offset())
+	if err != nil {
+		return nil, 0, fmt.Errorf("get all books: %w", err)
+	}
+
+	bookRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[Book])
+	if err != nil {
+		return nil, 0, fmt.Errorf("scan books: %w", err)
+	}
+
+	bookIDs := make([]int, 0, len(bookRows))
+	for _, book := range bookRows {
+		bookIDs = append(bookIDs, book.ID)
+
+	}
+
+	categoriesByBook, err := b.GetCategoriesByBookIDs(ctx, bookIDs)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	books := make([]*entities.Book, 0, len(bookRows))
+	for _, book := range bookRows {
+		bookWithCategories := BookWithCategories{
+			Book:        book,
+			CategoryIDs: categoriesByBook[book.ID],
+		}
+		books = append(books, toDomainBook(&bookWithCategories))
+	}
+
+	var total int
+	err = db.QueryRow(ctx, "SELECT COUNT(*) FROM books").Scan(&total)
+	if err != nil {
+		return nil, 0, fmt.Errorf("count books: %w", err)
+	}
+
+	return books, total, nil
+}
+
+func (b *BookRepository) Delete(ctx context.Context, bookID int) error {
+	db := txFromContext(ctx, b.pool)
+	query := "DELETE FROM books WHERE id = $1"
+	tag, err := db.Exec(ctx, query, bookID)
+	if err != nil {
+		return fmt.Errorf("delete book: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return entities.ErrBookNotFound
+	}
+
+	err = b.deleteBookCategories(ctx, bookID)
+	if err != nil {
+		return fmt.Errorf("delete book categories: %w", err)
+	}
+
+	return nil
+}
+
+func (b *BookRepository) Update(ctx context.Context, changes *entities.Book) (*entities.Book, error) {
+	db := txFromContext(ctx, b.pool)
+	query := `
+		UPDATE books
+		SET title     = COALESCE($1, title),
+		    year      = COALESCE($2, year),
+		    author_id = COALESCE($3, author_id),
+		    description = COALESCE($4, description)
+		WHERE id = $5
+		RETURNING id, title, author_id, year, description
+	`
+	row, err := db.Query(ctx, query, changes.Title(), changes.Year(), changes.AuthorID(), changes.Description(), changes.ID())
+	if err != nil {
+		return nil, fmt.Errorf("update book: %w", err)
+	}
+
+	bookRow, err := pgx.CollectOneRow(row, pgx.RowToStructByName[Book])
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, entities.ErrBookNotFound
+		}
+		if err = mapPostgresError(err); err != nil {
+			return nil, fmt.Errorf("error map pgs error: %w", err)
+		}
+
+		return nil, fmt.Errorf("update book: %w", err)
+	}
+
+	// Category
+	if changes.Categories() != nil {
+		if err = b.deleteBookCategories(ctx, bookRow.ID); err != nil {
+			return nil, fmt.Errorf("update book categories: %w", err)
+		}
+		if err = b.SetCategories(ctx, bookRow.ID, changes.Categories()); err != nil {
+			return nil, fmt.Errorf("update book categories: %w", err)
+		}
+	}
+
+	bookWithCategories := BookWithCategories{
+		Book:        bookRow,
+		CategoryIDs: changes.Categories(),
 	}
 
 	newBook := toDomainBook(&bookWithCategories)
@@ -219,144 +333,6 @@ func (b *BookRepository) GetCategoriesByBookIDs(ctx context.Context, bookIDs []i
 	}
 
 	return result, nil
-}
-
-func (b *BookRepository) GetAll(ctx context.Context, pagination *pagination.Pagination) ([]*entities.Book, int, error) {
-	db := txFromContext(ctx, b.pool)
-	query := `
-		SELECT id, title, year, author_id, description
-		FROM books
-		ORDER BY id
-		LIMIT $1
-		OFFSET $2
-`
-
-	rows, err := db.Query(ctx, query, pagination.Limit(), pagination.Offset())
-	if err != nil {
-		return nil, 0, fmt.Errorf("get all books: %w", err)
-	}
-
-	bookRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[Book])
-	if err != nil {
-		return nil, 0, fmt.Errorf("scan books: %w", err)
-	}
-
-	bookIDs := make([]int, 0, len(bookRows))
-	for _, book := range bookRows {
-		bookIDs = append(bookIDs, book.ID)
-
-	}
-
-	categoriesByBook, err := b.GetCategoriesByBookIDs(ctx, bookIDs)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	books := make([]*entities.Book, 0, len(bookRows))
-	for _, book := range bookRows {
-		bookWithCategories := BookWithCategories{
-			Book:        book,
-			CategoryIDs: categoriesByBook[book.ID],
-		}
-		books = append(books, toDomainBook(&bookWithCategories))
-	}
-
-	var total int
-	err = db.QueryRow(ctx, "SELECT COUNT(*) FROM books").Scan(&total)
-	if err != nil {
-		return nil, 0, fmt.Errorf("count books: %w", err)
-	}
-
-	return books, total, nil
-}
-
-func (b *BookRepository) Delete(ctx context.Context, bookID int) error {
-	db := txFromContext(ctx, b.pool)
-	query := "DELETE FROM books WHERE id = $1"
-	tag, err := db.Exec(ctx, query, bookID)
-	if err != nil {
-		return fmt.Errorf("delete book: %w", err)
-	}
-	if tag.RowsAffected() == 0 {
-		return entities.ErrBookNotFound
-	}
-
-	err = b.deleteBookCategories(ctx, bookID)
-	if err != nil {
-		return fmt.Errorf("delete book categories: %w", err)
-	}
-
-	return nil
-}
-
-func (b *BookRepository) Update(ctx context.Context, changes *entities.Book) (*entities.Book, error) {
-	db := txFromContext(ctx, b.pool)
-	query := `
-		UPDATE books
-		SET title     = COALESCE($1, title),
-		    year      = COALESCE($2, year),
-		    author_id = COALESCE($3, author_id),
-		    description = COALESCE($4, description)
-		WHERE id = $5
-		RETURNING id, title, author_id, year, description
-	`
-	row, err := db.Query(ctx, query, changes.Title(), changes.Year(), changes.AuthorID(), changes.Description(), changes.ID())
-	if err != nil {
-		return nil, fmt.Errorf("update book: %w", err)
-	}
-
-	bookRow, err := pgx.CollectOneRow(row, pgx.RowToStructByName[Book])
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, entities.ErrBookNotFound
-		}
-		if err = mapPostgresError(err); err != nil {
-			return nil, fmt.Errorf("error map pgs error: %w", err)
-		}
-
-		return nil, fmt.Errorf("update book: %w", err)
-	}
-
-	// Category
-	if changes.Categories() != nil {
-		if err = b.deleteBookCategories(ctx, bookRow.ID); err != nil {
-			return nil, fmt.Errorf("update book categories: %w", err)
-		}
-		if err = b.SetCategories(ctx, bookRow.ID, changes.Categories()); err != nil {
-			return nil, fmt.Errorf("update book categories: %w", err)
-		}
-	}
-
-	bookWithCategories := BookWithCategories{
-		Book:        bookRow,
-		CategoryIDs: changes.Categories(),
-	}
-
-	newBook := toDomainBook(&bookWithCategories)
-
-	return newBook, nil
-}
-
-func mapPostgresError(err error) error {
-	var pgErr *pgconn.PgError
-	if !errors.As(err, &pgErr) {
-		return err
-	}
-
-	if pgErr.Code != pgerrcode.ForeignKeyViolation {
-		return err
-	}
-
-	switch pgErr.ConstraintName {
-	case "fk_books_authors":
-		return entities.ErrAuthorNotFound
-	case "fk_book_categories_books":
-		return entities.ErrBookNotFound
-	case "fk_book_categories_categories":
-		return entities.ErrCategoryNotFound
-	}
-
-	return nil
 }
 
 func toDomainBook(b *BookWithCategories) *entities.Book {

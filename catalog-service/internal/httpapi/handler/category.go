@@ -41,10 +41,6 @@ func (h *CategoryHandler) GetCategories(c *gin.Context, params generated.GetCate
 		response = append(response, mapper.ToGeneratedCategoryResponse(category))
 	}
 
-	slog.InfoContext(ctx, "got all categories",
-		slog.Int("count", len(categories)),
-		slog.Int("total", total),
-	)
 	c.JSON(http.StatusOK, generated.GetCategories200JSONResponse{
 		Data:  response,
 		Total: total,
@@ -70,12 +66,6 @@ func (h *CategoryHandler) CreateCategory(c *gin.Context) {
 		return
 	}
 
-	slog.InfoContext(ctx, "created category",
-		slog.Group("category",
-			slog.Int("id", createdCategory.ID()),
-			slog.String("name", createdCategory.Name()),
-		),
-	)
 	c.JSON(http.StatusCreated, generated.CreateCategory201JSONResponse{
 		Data: mapper.ToGeneratedCategoryResponse(createdCategory),
 	})
@@ -96,12 +86,6 @@ func (h *CategoryHandler) GetCategoryById(c *gin.Context, id generated.ID) {
 		return
 	}
 
-	slog.InfoContext(ctx, "category found",
-		slog.Group("category",
-			slog.Int("id", category.ID()),
-			slog.String("name", category.Name()),
-		),
-	)
 	c.JSON(http.StatusOK, generated.GetCategoryById200JSONResponse{
 		Data: mapper.ToGeneratedCategoryResponse(category),
 	})
@@ -137,12 +121,6 @@ func (h *CategoryHandler) UpdateCategory(c *gin.Context, id generated.ID) {
 		return
 	}
 
-	slog.InfoContext(ctx, "updated category",
-		slog.Group("category",
-			slog.Int("id", id),
-			slog.String("name", category.Name()),
-		),
-	)
 	c.JSON(http.StatusOK, generated.UpdateCategory200JSONResponse{
 		Data: mapper.ToGeneratedCategoryResponse(category),
 	})
@@ -163,8 +141,5 @@ func (h *CategoryHandler) DeleteCategory(c *gin.Context, id generated.ID) {
 		return
 	}
 
-	slog.InfoContext(ctx, "category deleted",
-		slog.Int("category_id", id),
-	)
 	c.Status(http.StatusNoContent)
 }

@@ -156,5 +156,6 @@ func (s *BookService) CreateBookWithNewAuthor(ctx context.Context, commandBook *
 	if err != nil {
 		return nil, fmt.Errorf("create book with new author: %w", err)
 	}
+
 	return createdBook, nil
 }
