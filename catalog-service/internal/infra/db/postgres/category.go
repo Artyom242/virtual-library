@@ -7,6 +7,7 @@ import (
 	"virtual-library/catalog-service/internal/domain/entity"
 	"virtual-library/catalog-service/internal/domain/repository"
 	"virtual-library/catalog-service/internal/httpapi/pagination"
+	"virtual-library/catalog-service/internal/infra/db/postgres/query"
 	IRepository "virtual-library/catalog-service/internal/infra/db/repository"
 
 	"github.com/jackc/pgx/v5"
@@ -35,8 +36,7 @@ var _ repository.CategoryRepository = (*CategoryRepository)(nil)
 func (c *CategoryRepository) Create(ctx context.Context, category IRepository.ICategory) (*entity.Category, error) {
 	db := txFromContext(ctx, c.pool)
 
-	query := "INSERT INTO categories(name) VALUES($1) returning id, name"
-	rows, err := db.Query(ctx, query, category.Name())
+	rows, err := db.Query(ctx, query.CreateCategory, category.Name())
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
@@ -57,8 +57,7 @@ func (c *CategoryRepository) Create(ctx context.Context, category IRepository.IC
 func (c *CategoryRepository) GetByID(ctx context.Context, categoryID int) (*entity.Category, error) {
 	db := txFromContext(ctx, c.pool)
 
-	query := "SELECT categories.id, categories.name FROM categories WHERE id = $1"
-	row, err := db.Query(ctx, query, categoryID)
+	row, err := db.Query(ctx, query.GetCategoryByID, categoryID)
 	if err != nil {
 		return nil, fmt.Errorf("get category by id: %w", err)
 	}
@@ -78,14 +77,7 @@ func (c *CategoryRepository) GetByID(ctx context.Context, categoryID int) (*enti
 func (c *CategoryRepository) GetAll(ctx context.Context, pagination *pagination.Pagination) ([]*entity.Category, int, error) {
 	db := txFromContext(ctx, c.pool)
 
-	query := `
-		SELECT categories.id, categories.name 
-		FROM categories
-		ORDER BY categories.id
-		LIMIT $1
-		OFFSET $2
-		`
-	rows, err := db.Query(ctx, query, pagination.Limit(), pagination.Offset())
+	rows, err := db.Query(ctx, query.GetAllCategories, pagination.Limit(), pagination.Offset())
 	if err != nil {
 		return nil, 0, fmt.Errorf("get all categories: %w", err)
 	}
@@ -98,7 +90,7 @@ func (c *CategoryRepository) GetAll(ctx context.Context, pagination *pagination.
 	categories := toDomainCategories(categoryRows)
 
 	var total int
-	err = db.QueryRow(ctx, "SELECT COUNT(*) FROM categories").Scan(&total)
+	err = db.QueryRow(ctx, query.GetTotalCategories).Scan(&total)
 	if err != nil {
 		return nil, 0, fmt.Errorf("count categories: %w", err)
 	}
@@ -108,8 +100,8 @@ func (c *CategoryRepository) GetAll(ctx context.Context, pagination *pagination.
 
 func (c *CategoryRepository) Delete(ctx context.Context, categoryID int) error {
 	db := txFromContext(ctx, c.pool)
-	query := "DELETE FROM categories WHERE id = $1"
-	tag, err := db.Exec(ctx, query, categoryID)
+
+	tag, err := db.Exec(ctx, query.DeleteCategory, categoryID)
 	if err != nil {
 		return fmt.Errorf("delete category: %w", err)
 	}
@@ -123,11 +115,7 @@ func (c *CategoryRepository) Delete(ctx context.Context, categoryID int) error {
 func (c *CategoryRepository) Update(ctx context.Context, category IRepository.ICategory) (*entity.Category, error) {
 	db := txFromContext(ctx, c.pool)
 
-	query := `UPDATE categories 
-		SET name = COALESCE($1, name) 
-		WHERE id = $2 
-		RETURNING id, name`
-	row, err := db.Query(ctx, query, category.Name(), category.ID())
+	row, err := db.Query(ctx, query.UpdateCategory, category.Name(), category.ID())
 	if err != nil {
 		return nil, fmt.Errorf("update category: %w", err)
 	}

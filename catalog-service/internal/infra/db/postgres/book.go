@@ -7,6 +7,7 @@ import (
 	"virtual-library/catalog-service/internal/domain/entity"
 	"virtual-library/catalog-service/internal/domain/repository"
 	"virtual-library/catalog-service/internal/httpapi/pagination"
+	"virtual-library/catalog-service/internal/infra/db/postgres/query"
 	IRepository "virtual-library/catalog-service/internal/infra/db/repository"
 
 	"github.com/jackc/pgx/v5"
@@ -42,12 +43,8 @@ type BookWithCategories struct {
 
 func (b *BookRepository) Create(ctx context.Context, book IRepository.IBook) (*entity.Book, error) {
 	db := txFromContext(ctx, b.pool)
-	query := `
-		INSERT INTO books(title, year, author_id, description) 
-		VALUES($1, $2, $3, $4) 
-		RETURNING id, title, year, author_id, description
-	`
-	row, err := db.Query(ctx, query, book.Title(), book.Year(), book.AuthorID(), book.Description())
+
+	row, err := db.Query(ctx, query.CreateBook, book.Title(), book.Year(), book.AuthorID(), book.Description())
 	if err != nil {
 		return nil, fmt.Errorf("create book: %w", err)
 	}
@@ -77,8 +74,7 @@ func (b *BookRepository) Create(ctx context.Context, book IRepository.IBook) (*e
 func (b *BookRepository) GetByID(ctx context.Context, bookID int) (*entity.Book, error) {
 	db := txFromContext(ctx, b.pool)
 
-	query := `SELECT id, title, year, author_id, description FROM books WHERE id = $1`
-	row, err := db.Query(ctx, query, bookID)
+	row, err := db.Query(ctx, query.GetBookById, bookID)
 	if err != nil {
 		return nil, fmt.Errorf("get book by id: %w", err)
 	}
@@ -108,15 +104,8 @@ func (b *BookRepository) GetByID(ctx context.Context, bookID int) (*entity.Book,
 
 func (b *BookRepository) GetAll(ctx context.Context, pagination *pagination.Pagination) ([]*entity.Book, int, error) {
 	db := txFromContext(ctx, b.pool)
-	query := `
-		SELECT id, title, year, author_id, description
-		FROM books
-		ORDER BY id
-		LIMIT $1
-		OFFSET $2
-`
 
-	rows, err := db.Query(ctx, query, pagination.Limit(), pagination.Offset())
+	rows, err := db.Query(ctx, query.GetAllBooks, pagination.Limit(), pagination.Offset())
 	if err != nil {
 		return nil, 0, fmt.Errorf("get all books: %w", err)
 	}
@@ -129,7 +118,6 @@ func (b *BookRepository) GetAll(ctx context.Context, pagination *pagination.Pagi
 	bookIDs := make([]int, 0, len(bookRows))
 	for _, book := range bookRows {
 		bookIDs = append(bookIDs, book.ID)
-
 	}
 
 	categoriesByBook, err := b.GetCategoriesByBookIDs(ctx, bookIDs)
@@ -147,7 +135,7 @@ func (b *BookRepository) GetAll(ctx context.Context, pagination *pagination.Pagi
 	}
 
 	var total int
-	err = db.QueryRow(ctx, "SELECT COUNT(*) FROM books").Scan(&total)
+	err = db.QueryRow(ctx, query.GetTotalBooks).Scan(&total)
 	if err != nil {
 		return nil, 0, fmt.Errorf("count books: %w", err)
 	}
@@ -157,8 +145,8 @@ func (b *BookRepository) GetAll(ctx context.Context, pagination *pagination.Pagi
 
 func (b *BookRepository) Delete(ctx context.Context, bookID int) error {
 	db := txFromContext(ctx, b.pool)
-	query := "DELETE FROM books WHERE id = $1"
-	tag, err := db.Exec(ctx, query, bookID)
+
+	tag, err := db.Exec(ctx, query.DeleteBook, bookID)
 	if err != nil {
 		return fmt.Errorf("delete book: %w", err)
 	}
@@ -176,16 +164,8 @@ func (b *BookRepository) Delete(ctx context.Context, bookID int) error {
 
 func (b *BookRepository) Update(ctx context.Context, changes IRepository.IBook) (*entity.Book, error) {
 	db := txFromContext(ctx, b.pool)
-	query := `
-		UPDATE books
-		SET title     = COALESCE($1, title),
-		    year      = COALESCE($2, year),
-		    author_id = COALESCE($3, author_id),
-		    description = COALESCE($4, description)
-		WHERE id = $5
-		RETURNING id, title, author_id, year, description
-	`
-	row, err := db.Query(ctx, query, changes.Title(), changes.Year(), changes.AuthorID(), changes.Description(), changes.ID())
+
+	row, err := db.Query(ctx, query.UpdateBook, changes.Title(), changes.Year(), changes.AuthorID(), changes.Description(), changes.ID())
 	if err != nil {
 		return nil, fmt.Errorf("update book: %w", err)
 	}
@@ -224,8 +204,8 @@ func (b *BookRepository) Update(ctx context.Context, changes IRepository.IBook) 
 
 func (b *BookRepository) deleteBookCategories(ctx context.Context, bookID int) error {
 	db := txFromContext(ctx, b.pool)
-	query := `DELETE FROM book_categories WHERE book_id = $1`
-	_, err := db.Exec(ctx, query, bookID)
+
+	_, err := db.Exec(ctx, query.DeleteBookCategories, bookID)
 	if err != nil {
 		return fmt.Errorf("delete book categories: %w", err)
 	}
@@ -236,13 +216,9 @@ func (b *BookRepository) deleteBookCategories(ctx context.Context, bookID int) e
 func (b *BookRepository) SetCategories(ctx context.Context, bookID int, categories []int) error {
 	db := txFromContext(ctx, b.pool)
 	batch := &pgx.Batch{}
-	query := `
-		INSERT INTO book_categories(book_id, category_id)
-		VALUES($1, $2)
-		RETURNING category_id
-`
+
 	for _, categoryID := range categories {
-		batch.Queue(query, bookID, categoryID)
+		batch.Queue(query.SetCategories, bookID, categoryID)
 	}
 
 	batchLen := batch.Len()
@@ -275,8 +251,7 @@ func (b *BookRepository) SetCategories(ctx context.Context, bookID int, categori
 func (b *BookRepository) GetCategoriesByBookID(ctx context.Context, bookID int) ([]int, error) {
 	db := txFromContext(ctx, b.pool)
 
-	query := `SELECT category_id FROM book_categories WHERE book_id = $1`
-	rows, err := db.Query(ctx, query, bookID)
+	rows, err := db.Query(ctx, query.GetCategoriesByBookID, bookID)
 	if err != nil {
 		return nil, fmt.Errorf("get book_categories: %w", err)
 	}
@@ -298,22 +273,16 @@ func (b *BookRepository) GetCategoriesByBookID(ctx context.Context, bookID int) 
 func (b *BookRepository) GetCategoriesByBookIDs(ctx context.Context, bookIDs []int) (map[int][]int, error) {
 	result := make(map[int][]int, len(bookIDs))
 
-	for _, id := range bookIDs {
-		result[id] = make([]int, 0)
-	}
-
 	if len(bookIDs) == 0 {
 		return result, nil
 	}
 
-	query := `
-        SELECT book_id, category_id
-        FROM book_categories
-        WHERE book_id = ANY($1)
-    `
+	for _, id := range bookIDs {
+		result[id] = make([]int, 0)
+	}
 
 	db := txFromContext(ctx, b.pool)
-	rows, err := db.Query(ctx, query, bookIDs)
+	rows, err := db.Query(ctx, query.GetCategoriesByBookIDs, bookIDs)
 	if err != nil {
 		return nil, fmt.Errorf("get categories by book ids: %w", err)
 	}
@@ -323,7 +292,7 @@ func (b *BookRepository) GetCategoriesByBookIDs(ctx context.Context, bookIDs []i
 		var bookID, categoryID int
 
 		if err := rows.Scan(&bookID, &categoryID); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan book category: %w", err)
 		}
 
 		result[bookID] = append(result[bookID], categoryID)

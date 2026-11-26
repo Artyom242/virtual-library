@@ -8,7 +8,6 @@ var (
 	ErrInvalidBookID          = errors.New("invalid book id")
 	ErrInvalidBookData        = errors.New("invalid book data")
 	ErrInvalidBookDescription = errors.New("invalid book description")
-	ErrFailed                 = errors.New("invalid book description")
 )
 
 // authors

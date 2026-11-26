@@ -8,6 +8,7 @@ import (
 	"virtual-library/catalog-service/internal/domain/entity"
 	"virtual-library/catalog-service/internal/domain/repository"
 	"virtual-library/catalog-service/internal/httpapi/pagination"
+	"virtual-library/catalog-service/internal/infra/db/postgres/query"
 	IRepository "virtual-library/catalog-service/internal/infra/db/repository"
 
 	"github.com/jackc/pgx/v5"
@@ -36,8 +37,7 @@ var _ repository.AuthorRepository = (*AuthorRepository)(nil)
 func (a *AuthorRepository) Create(c context.Context, author IRepository.IAuthor) (*entity.Author, error) {
 	db := txFromContext(c, a.pool)
 
-	query := "INSERT INTO authors(name) VALUES($1) returning id, name"
-	rows, err := db.Query(c, query, author.Name())
+	rows, err := db.Query(c, query.CreateAuthor, author.Name())
 	if err != nil {
 		return nil, err
 	}
@@ -60,8 +60,7 @@ func (a *AuthorRepository) Create(c context.Context, author IRepository.IAuthor)
 func (a *AuthorRepository) GetByID(c context.Context, authorID int) (*entity.Author, error) {
 	db := txFromContext(c, a.pool)
 
-	query := "SELECT authors.id, authors.name FROM authors WHERE id = $1"
-	row, err := db.Query(c, query, authorID)
+	row, err := db.Query(c, query.GetAuthorByID, authorID)
 	if err != nil {
 		return nil, fmt.Errorf("get author by id: %w", err)
 	}
@@ -82,14 +81,7 @@ func (a *AuthorRepository) GetByID(c context.Context, authorID int) (*entity.Aut
 func (a *AuthorRepository) GetAll(c context.Context, pagination *pagination.Pagination) ([]*entity.Author, int, error) {
 	db := txFromContext(c, a.pool)
 
-	query := `
-		SELECT authors.id, authors.name 
-		FROM authors
-		ORDER BY authors.id
-		LIMIT $1
-		OFFSET $2
-		`
-	rows, err := db.Query(c, query, pagination.Limit(), pagination.Offset())
+	rows, err := db.Query(c, query.GetAllAuthors, pagination.Limit(), pagination.Offset())
 	if err != nil {
 		return nil, 0, fmt.Errorf("get all authors: %w", err)
 	}
@@ -102,7 +94,7 @@ func (a *AuthorRepository) GetAll(c context.Context, pagination *pagination.Pagi
 	authors := toDomainAuthors(authorRows)
 
 	var total int
-	err = db.QueryRow(c, "SELECT COUNT(*) FROM authors").Scan(&total)
+	err = db.QueryRow(c, query.GetTotalAuthors).Scan(&total)
 	if err != nil {
 		return nil, 0, fmt.Errorf("count authors: %w", err)
 	}
@@ -113,15 +105,7 @@ func (a *AuthorRepository) GetAll(c context.Context, pagination *pagination.Pagi
 func (a *AuthorRepository) GetOrCreate(ctx context.Context, author IRepository.IAuthor) (*entity.Author, error) {
 	db := txFromContext(ctx, a.pool)
 
-	query := `
-		INSERT INTO authors(name) 
-		VALUES($1)  
-		ON CONFLICT (name) 
-		    DO NOTHING 
-			RETURNING id, name
-	`
-
-	row, err := db.Query(ctx, query, author.Name())
+	row, err := db.Query(ctx, query.GetOrCreateAuthor, author.Name())
 	if err != nil {
 		return nil, fmt.Errorf("create author: %w", err)
 	}
@@ -132,8 +116,7 @@ func (a *AuthorRepository) GetOrCreate(ctx context.Context, author IRepository.I
 			return nil, fmt.Errorf("scan author: %w", err)
 		}
 
-		query = `SELECT id, name FROM authors WHERE name = $1`
-		row, err = db.Query(ctx, query, author.Name())
+		row, err = db.Query(ctx, query.GetAuthorsByName, author.Name())
 		if err != nil {
 			return nil, fmt.Errorf("get author: %w", err)
 		}
@@ -152,10 +135,9 @@ func (a *AuthorRepository) GetOrCreate(ctx context.Context, author IRepository.I
 
 func (a *AuthorRepository) HasBooks(c context.Context, authorID int) (bool, error) {
 	db := txFromContext(c, a.pool)
-	query := "SELECT EXISTS(SELECT 1 FROM books WHERE author_id = $1)"
 
 	var hasBooks bool
-	err := db.QueryRow(c, query, authorID).Scan(&hasBooks)
+	err := db.QueryRow(c, query.ExistsBooksByAuthorID, authorID).Scan(&hasBooks)
 	if err != nil {
 		return false, fmt.Errorf("check author books: %w", err)
 	}
@@ -165,8 +147,8 @@ func (a *AuthorRepository) HasBooks(c context.Context, authorID int) (bool, erro
 
 func (a *AuthorRepository) Delete(c context.Context, authorID int) error {
 	db := txFromContext(c, a.pool)
-	query := "DELETE FROM authors WHERE id = $1"
-	tag, err := db.Exec(c, query, authorID)
+
+	tag, err := db.Exec(c, query.DeleteAuthor, authorID)
 	if err != nil {
 		return fmt.Errorf("delete author: %w", err)
 	}
@@ -180,11 +162,7 @@ func (a *AuthorRepository) Delete(c context.Context, authorID int) error {
 func (a *AuthorRepository) Update(c context.Context, author IRepository.IAuthor) (*entity.Author, error) {
 	db := txFromContext(c, a.pool)
 
-	query := `UPDATE authors 
-		SET name = COALESCE($1, name) 
-		WHERE id = $2 
-		RETURNING id, name`
-	row, err := db.Query(c, query, author.Name(), author.ID())
+	row, err := db.Query(c, query.UpdateAuthor, author.Name(), author.ID())
 	if err != nil {
 		return nil, fmt.Errorf("update author: %w", err)
 	}
