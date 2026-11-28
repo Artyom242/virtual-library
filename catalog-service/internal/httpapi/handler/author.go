@@ -66,7 +66,7 @@ func (h *AuthorHandler) CreateAuthor(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, generated.CreateAuthor201JSONResponse{
+	c.JSON(http.StatusCreated, generated.CreateAuthor201JSONResponse{
 		Data: mapper.ToGeneratedAuthorResponse(createdAuthor),
 	})
 }
