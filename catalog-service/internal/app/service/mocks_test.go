@@ -11,14 +11,6 @@ func strPtr(s string) *string { return &s }
 
 func intPtr(v int) *int { return &v }
 
-func intsPtr(v ...int) *[]int {
-	if v == nil {
-		v = []int{}
-	}
-
-	return &v
-}
-
 type mockTransactor struct {
 	do func(ctx context.Context, fn func(context.Context) error) error
 }
