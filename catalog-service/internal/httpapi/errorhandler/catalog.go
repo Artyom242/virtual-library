@@ -76,6 +76,11 @@ func HandleCatalogError(
 		level = slog.LevelWarn
 		message = entity.ErrInvalidAuthorData.Error()
 
+	case errors.Is(err, entity.ErrInvalidAuthorID):
+		status = http.StatusBadRequest
+		level = slog.LevelWarn
+		message = entity.ErrInvalidAuthorID.Error()
+
 	case errors.Is(err, app.ErrAuthorAlreadyExists):
 		status = http.StatusConflict
 		level = slog.LevelWarn
@@ -101,6 +106,11 @@ func HandleCatalogError(
 		status = http.StatusConflict
 		level = slog.LevelWarn
 		message = entity.ErrCategoryAlreadyExists.Error()
+
+	case errors.Is(err, entity.ErrCategoryNotUnique):
+		status = http.StatusConflict
+		level = slog.LevelWarn
+		message = entity.ErrCategoryNotUnique.Error()
 
 	default:
 		status = http.StatusInternalServerError

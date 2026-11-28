@@ -33,6 +33,9 @@ func NewService(
 func (s *BookService) CreateBook(ctx context.Context, bookCommand *command.CreateBookCommand) (*entity.Book, error) {
 	var newBook *entity.Book
 	err := s.tx.Do(ctx, func(ctx context.Context) error {
+		if !isIDMoreThanZero(bookCommand.AuthorID) {
+			return entity.ErrInvalidAuthorID
+		}
 		_, err := s.repoAuthor.GetByID(ctx, bookCommand.AuthorID)
 		if err != nil {
 			if errors.Is(err, entity.ErrAuthorNotFound) {
@@ -87,6 +90,9 @@ func (s *BookService) UpdateBook(ctx context.Context, bookCommand *command.Updat
 		}
 
 		if bookCommand.AuthorID != nil {
+			if !isIDMoreThanZero(*bookCommand.AuthorID) {
+				return entity.ErrInvalidAuthorID
+			}
 			_, err = s.repoAuthor.GetByID(ctx, *bookCommand.AuthorID)
 			if err != nil {
 				return err
@@ -158,4 +164,8 @@ func (s *BookService) CreateBookWithNewAuthor(ctx context.Context, commandBook *
 	}
 
 	return createdBook, nil
+}
+
+func isIDMoreThanZero(id int) bool {
+	return id > 0
 }

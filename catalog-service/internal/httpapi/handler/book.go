@@ -42,7 +42,7 @@ func (h *BookHandler) GetBooks(c *gin.Context, params generated.GetBooksParams) 
 
 func (h *BookHandler) GetBookById(c *gin.Context, id generated.ID) {
 	ctx := c.Request.Context()
-	if !validation.IsIDMoreThanOne(id) {
+	if !validation.IsIDMoreThanZero(id) {
 		c.JSON(http.StatusBadRequest, generated.ErrorResponse{
 			Message: entity.ErrInvalidBookID.Error(),
 		})
@@ -65,23 +65,10 @@ func (h *BookHandler) CreateBook(c *gin.Context) {
 	var request generated.CreateBookJSONRequestBody
 
 	if err := c.ShouldBindJSON(&request); err != nil {
-		errorHandler.HandleCatalogError(ctx, c, err, slog.String("title", request.Title))
-		return
-	}
-	if !validation.IsIDMoreThanOne(request.AuthorId) {
-		errorHandler.HandleCatalogError(ctx, c, entity.ErrInvalidAuthorID,
-			slog.Int("author_id", request.AuthorId),
+		errorHandler.HandleCatalogError(ctx, c, err,
+			slog.String("title", request.Title),
 		)
 		return
-	}
-
-	if request.CategoryIds != nil {
-		if !validation.IsUniqueValues(*request.CategoryIds) {
-			errorHandler.HandleCatalogError(ctx, c, entity.ErrCategoryNotUnique,
-				slog.Any("categories_ids", request.CategoryIds),
-			)
-			return
-		}
 	}
 
 	book := command.CreateBookCommand{
@@ -119,15 +106,6 @@ func (h *BookHandler) CreateBookWithAuthor(c *gin.Context) {
 		return
 	}
 
-	if *request.CategoryIds != nil {
-		if !validation.IsUniqueValues(*request.CategoryIds) {
-			errorHandler.HandleCatalogError(ctx, c, entity.ErrCategoryNotUnique,
-				slog.Any("categories_ids", *request.CategoryIds),
-			)
-			return
-		}
-	}
-
 	commandBookWithAuthor := command.CreateBookCommand{
 		Title:       request.Title,
 		Year:        request.Year,
@@ -152,7 +130,7 @@ func (h *BookHandler) CreateBookWithAuthor(c *gin.Context) {
 
 func (h *BookHandler) DeleteBook(c *gin.Context, id generated.ID) {
 	ctx := c.Request.Context()
-	if !validation.IsIDMoreThanOne(id) {
+	if !validation.IsIDMoreThanZero(id) {
 		c.JSON(http.StatusBadRequest, generated.ErrorResponse{
 			Message: entity.ErrInvalidBookID.Error(),
 		})
@@ -170,7 +148,7 @@ func (h *BookHandler) DeleteBook(c *gin.Context, id generated.ID) {
 
 func (h *BookHandler) UpdateBook(c *gin.Context, id generated.ID) {
 	ctx := c.Request.Context()
-	if !validation.IsIDMoreThanOne(id) {
+	if !validation.IsIDMoreThanZero(id) {
 		c.JSON(http.StatusBadRequest, generated.ErrorResponse{
 			Message: entity.ErrInvalidBookID.Error(),
 		})

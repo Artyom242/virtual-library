@@ -35,19 +35,21 @@ func (b *Book) Categories() []int {
 }
 
 func (b *Book) validate() error {
-	if strings.Trim(b.title, " ") == "" {
+	if strings.TrimSpace(b.title) == "" {
 		return fmt.Errorf("%w: title is required", ErrValidationError)
 	}
-	if b.year <= 1 {
-		return fmt.Errorf("%w: year must be greater than 1", ErrValidationError)
+	if b.year < 1 {
+		return fmt.Errorf("%w: year must be greater than 0", ErrValidationError)
 	}
-	if b.authorID <= 1 {
-		return fmt.Errorf("%w: author_id must be greater than 1", ErrValidationError)
+	if b.authorID < 1 {
+		return fmt.Errorf("%w: author_id must be greater than 0", ErrValidationError)
 	}
-	if b.description != nil && strings.Trim(*b.description, " ") == "" {
+	if b.description != nil && strings.TrimSpace(*b.description) == "" {
 		return fmt.Errorf("%w: description must not be empty", ErrValidationError)
 	}
-
+	if b.categories != nil && !isUniqueCategoryIDs(*b.categories) {
+		return ErrCategoryNotUnique
+	}
 	return nil
 }
 
@@ -120,8 +122,6 @@ func (b *Book) ApplyChanges(changes BookChanges) error {
 	}
 	if changes.CategoriesIDs != nil {
 		updated.categories = changes.CategoriesIDs
-	} else {
-		updated.categories = &[]int{}
 	}
 
 	if err := updated.validate(); err != nil {
@@ -137,4 +137,17 @@ func (bc BookChanges) isEmpty() bool {
 		return true
 	}
 	return false
+}
+
+func isUniqueCategoryIDs(slice []int) bool {
+	values := make(map[int]bool)
+
+	for _, value := range slice {
+		if _, ok := values[value]; ok {
+			return false
+		}
+		values[value] = true
+	}
+
+	return true
 }

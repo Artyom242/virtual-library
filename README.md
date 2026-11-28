@@ -167,47 +167,93 @@ Generics будут изучаться и применяться там, где 
 Текущая структура проекта:
 
 ```text
-virtual-library/
-├── catalog-service/
-│   ├── cmd/
-│   │   └── catalog/
-│   │       └── main.go
-│   ├── internal/
-│   │   ├── domain/
-│   │   │   ├── author.go
-│   │   │   ├── author_repository.go
-│   │   │   ├── book.go
-│   │   │   ├── book_repository.go
-│   │   │   ├── errors.go
-│   │   │   └── transactor.go
-│   │   ├── httpapi/
-│   │   │   ├── author_handler.go
-│   │   │   ├── book_handler.go
-│   │   │   ├── dto/
-│   │   │   │   ├── author.go
-│   │   │   │   └── book.go
-│   │   │   └── router.go
-│   │   ├── postgres/
-│   │   │   ├── author.go
-│   │   │   ├── book.go
-│   │   │   ├── transactor.go
-│   │   │   └── tx_context.go
-│   │   └── service/
-│   │       ├── author.go
-│   │       └── book.go
-│   ├── go.mod
-│   └── go.sum
-├── circulation-service/
-│   ├── cmd/
-│   │   └── circulation/
-│   ├── internal/
-│   └── go.mod
+
+├── catalog-service
+│   ├── api
+│   │   └── openapi.yaml
+│   ├── cmd
+│   │   └── catalog
+│   │       └── main.go
+│   ├── go.mod
+│   ├── go.sum
+│   ├── internal
+│   │   ├── app
+│   │   │   ├── command
+│   │   │   │   ├── author.go
+│   │   │   │   ├── book.go
+│   │   │   │   └── category.go
+│   │   │   ├── errors.go
+│   │   │   ├── interface
+│   │   │   │   ├── author.go
+│   │   │   │   ├── book.go
+│   │   │   │   └── category.go
+│   │   │   ├── service
+│   │   │   │   ├── author.go
+│   │   │   │   ├── book.go
+│   │   │   │   └── category.go
+│   │   │   └── transactor.go
+│   │   ├── domain
+│   │   │   ├── entity
+│   │   │   │   ├── author.go
+│   │   │   │   ├── book.go
+│   │   │   │   ├── category.go
+│   │   │   │   └── errors.go
+│   │   │   └── repository
+│   │   │       ├── author.go
+│   │   │       ├── book.go
+│   │   │       └── category.go
+│   │   ├── httpapi
+│   │   │   ├── errorhandler
+│   │   │   │   ├── catalog.go
+│   │   │   │   ├── errors.go
+│   │   │   │   └── response.go
+│   │   │   ├── generated
+│   │   │   │   └── api.gen.go
+│   │   │   ├── generate.go
+│   │   │   ├── handler
+│   │   │   │   ├── author.go
+│   │   │   │   ├── book.go
+│   │   │   │   ├── category.go
+│   │   │   │   └── combined.go
+│   │   │   ├── mapper
+│   │   │   │   └── response.go
+│   │   │   ├── middleware
+│   │   │   │   └── log.go
+│   │   │   ├── pagination
+│   │   │   │   └── pagination.go
+│   │   │   ├── router.go
+│   │   │   └── validation
+│   │   │       └── validation.go
+│   │   └── infra
+│   │       ├── config
+│   │       │   └── config.go
+│   │       └── db
+│   │           ├── postgres
+│   │           │   ├── author.go
+│   │           │   ├── book.go
+│   │           │   ├── category.go
+│   │           │   ├── connection.go
+│   │           │   ├── errors.go
+│   │           │   ├── query
+│   │           │   │   ├── author.go
+│   │           │   │   ├── book.go
+│   │           │   │   └── category.go
+│   │           │   ├── transactor.go
+│   │           │   └── tx_context.go
+│   │           └── repository
+│   │               ├── author.go
+│   │               ├── book.go
+│   │               └── category.go
+│   └── oapi-codegen.yaml
+├── circulation-service
+│   ├── cmd
+│   │   └── circulation
+│   ├── go.mod
+│   └── internal
+├── CLAUDE.md
 ├── compose.yaml
 ├── go.work
 ├── go.work.sum
-├── .env.example
-├── .gitignore
-├── CLAUDE.md
 └── README.md
 ```
 
@@ -323,40 +369,5 @@ DATABASE_URL=postgres://your_user:your_password@localhost:5432/virtual_library?s
 cd catalog-service
 go test ./...
 ```
-
-Планируется добавить:
-
-- unit-тесты бизнес-логики с fake-реализациями интерфейсов;
-- интеграционные тесты PostgreSQL-репозиториев и транзакционных сценариев;
-- проверки HTTP-обработчиков;
-- Testcontainers для запуска инфраструктуры в тестовом окружении.
-
-## План развития
-
-1. Завершить проектирование схем данных и зафиксировать SQL-миграции Catalog Service.
-2. Добавить unit- и интеграционные тесты для Catalog Service.
-3. Реализовать Circulation Service: читатели, физические экземпляры, выдача, возврат и продление.
-4. Реализовать ограничения выдачи: не более 5 активных книг на читателя, первоначальный срок один календарный месяц и не более двух продлений.
-5. Настроить синхронное взаимодействие сервисов через gRPC.
-6. Добавить события и асинхронную обработку через RabbitMQ.
-7. Внедрить Redis и стратегию инвалидации кэша, если она потребуется.
-8. Расширить наблюдаемость с помощью OpenTelemetry и Prometheus.
-9. Подготовить контейнеризацию приложений, CI/CD и сценарии отказоустойчивости.
-
-Порядок может уточняться по мере развития проекта.
-
-## Принципы разработки
-
-- Предпочитать простые решения, соответствующие задачам проекта.
-- Разделять ответственность между HTTP-слоем, бизнес-логикой, доменными контрактами и хранением данных.
-- Определять интерфейсы со стороны потребителя и не создавать абстракции без необходимости.
-- Не связывать бизнес-логику с конкретной базой данных или инфраструктурным адаптером.
-- Обрабатывать ошибки явно и не раскрывать клиенту внутренние детали инфраструктуры.
-- Использовать транзакции для операций, которые должны выполняться атомарно.
-- Покрывать бизнес-логику unit-тестами, а интеграции — интеграционными тестами.
-- Не хранить секреты в системе контроля версий.
-- Документировать архитектурные решения и ограничения по мере их появления.
-
----
 
 Проект находится в активной разработке. README обновляется вместе с реализацией и согласованными проектными решениями.
